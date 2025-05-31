@@ -6,7 +6,7 @@ langchain-openai>=0.1.0
 transformers>=4.40.0
 torch>=2.3.0           # Latest version for better Metal support on Apple Silicon
 huggingface-hub>=0.20.0
-ctransformers>=0.2.28  # For faster inference with GGUF models (with Apple Metal support)
+ctransformers>=0.2.27  # For faster inference with GGUF models (with Apple Metal support)
 hf_transfer>=0.1.0     # For faster model downloads
 accelerate>=0.21.0     # For better GPU offloading
 

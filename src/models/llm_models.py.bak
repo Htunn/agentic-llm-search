@@ -57,7 +57,6 @@ class LLMModel:
 class HuggingFaceModel(LLMModel):
     """HuggingFace model wrapper for local LLMs"""
     
-
     def __init__(self, model_name: str = "./src/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf", **kwargs):
         # HuggingFace models don't need an API key for inference
         super().__init__(model_name, api_key=None, **kwargs)
@@ -83,7 +82,7 @@ class HuggingFaceModel(LLMModel):
                 # Set appropriate GPU configuration based on platform
                 if is_apple_silicon:
                     logger.info("Detected Apple Silicon (M-series) - enabling Metal GPU acceleration")
-                    # Set GPU layers for M-series chips
+                    # Pass parameters directly without nested config dictionary
                     self.model = CTModelForCausalLM.from_pretrained(
                         model_name,
                         model_type="llama",
@@ -101,9 +100,8 @@ class HuggingFaceModel(LLMModel):
                         gpu_layers=0  # CPU only
                     )
                 
-                # Load tokenizer from Hugging Face
+                # Load tokenizer from Hugging Face - use directly with model instead of pipeline
                 self.tokenizer = AutoTokenizer.from_pretrained("TinyLlama/TinyLlama-1.1B-Chat-v1.0")
-                
             else:
                 # Use standard HuggingFace transformers
                 self.tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -111,7 +109,7 @@ class HuggingFaceModel(LLMModel):
                 # Check for Apple Silicon to use MPS (Metal Performance Shaders)
                 import platform
                 is_apple_silicon = (platform.system() == "Darwin" and 
-                                  platform.machine().startswith(('arm', 'aarch')))
+                                   platform.machine().startswith(('arm', 'aarch')))
                 
                 # Set the appropriate device for accelerated computing
                 if is_apple_silicon and torch.backends.mps.is_available():
@@ -144,9 +142,9 @@ class HuggingFaceModel(LLMModel):
         except Exception as e:
             logger.error(f"Failed to load HuggingFace model: {str(e)}")
             raise
-
+        
     def generate_response(self, prompt: str, context: Optional[str] = None) -> str:
-        # Generate response using HuggingFace model
+        """Generate response using HuggingFace model"""
         try:
             # Format prompt based on model's expected format
             system_prompt = self._get_system_prompt()
@@ -156,73 +154,30 @@ class HuggingFaceModel(LLMModel):
             else:
                 full_prompt = f"{system_prompt}\n\nUser: {prompt}\n\nAssistant:"
             
-            # Different handling for GGUF models vs standard HF models
-            if hasattr(self, 'generator'):
-                # Use the pipeline for standard HF models
-                response = self.generator(
-                    full_prompt, 
-                    max_length=len(self.tokenizer(full_prompt).input_ids) + self.max_tokens,
-                    num_return_sequences=1
+            # Use ctransformers model directly
+            logger.info("Generating text with ctransformers model...")
+            # Simple text generation with the GGUF model
+            try:
+                generated_text = self.model(
+                    full_prompt,
+                    max_new_tokens=self.max_tokens,
+                    temperature=float(self.temperature),
+                    top_p=0.95
                 )
-                
-                # Extract generated text from pipeline output
-                if isinstance(response, list) and response:
-                    if isinstance(response[0], dict) and 'generated_text' in response[0]:
-                        generated_text = response[0]['generated_text']
-                    else:
-                        generated_text = str(response[0])
-                else:
-                    generated_text = str(response)
-            else:
-                # For GGUF models using ctransformers, known issue with 'tolist' attribute
-                # Just use a predefined answer for now as a workaround
-                try:
-                    # Create a basic summarization from the search results
-                    generated_text = full_prompt
-                    
-                    # Add a default generation for now - in the future, this could be fixed with proper ctransformers integration
-                    if context and "search results" in context:
-                        # Pull the titles from the search results for a basic response
-                        sources = []
-                        try:
-                            lines = context.split("\n")
-                            for line in lines:
-                                if line.startswith("[") and "] Title:" in line:
-                                    sources.append(line)
-                            
-                            generated_text += "\n\nBased on the search results, I can provide the following information:\n\n"
-                            generated_text += "I found several relevant sources that match your query. "
-                            generated_text += "Please check the list of sources below for more information.\n\n"
-                            
-                            for i, source in enumerate(sources, 1):
-                                generated_text += f"Source {i}: {source.split('] Title:')[1].strip()}\n"
-                        except Exception as parse_error:
-                            logger.warning(f"Error parsing context: {str(parse_error)}")
-                    else:
-                        # Generic response if no context
-                        generated_text += "\n\nI apologize, but I don't have enough information to provide a detailed answer to your question."
-                    
-                except Exception as e:
-                    # If all fails, use a very simple fallback
-                    generated_text = full_prompt + "\nI apologize, but I'm having trouble processing your request right now."
-                    logger.error(f"Final error in text generation: {str(e)}")
+            except Exception as e:
+                logger.error(f"Error during text generation: {str(e)}")
+                # Try simpler invocation
+                generated_text = self.model(full_prompt)
             
             # Extract just the assistant's response
-            if "Assistant:" in generated_text:
-                assistant_response = generated_text.split("Assistant:")[-1].strip()
-            else:
-                # If the model didn't follow the format, return the generated text after the prompt
-                assistant_response = generated_text[len(full_prompt):].strip()
-                
-            # If empty or too short, return a fallback message
-            if len(assistant_response) < 5:
-                assistant_response = "I apologize, but I wasn't able to generate a proper response. Please try again with a different query."
-                
+            assistant_response = generated_text.split("Assistant:")[-1].strip()
+            
             return assistant_response
             
         except Exception as e:
             logger.error(f"HuggingFace model error: {str(e)}")
             return f"Error generating response: {str(e)}"
+    
     def _get_system_prompt(self) -> str:
         """Get system prompt for the model"""
         return """You are an intelligent research assistant that provides accurate, well-researched answers with proper citations. 

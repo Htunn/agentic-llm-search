@@ -35,6 +35,9 @@ MODEL_PATH = f"./src/models/{MODEL_FILE}"
 
 def install_missing_packages():
     """Install missing required packages"""
+    global HF_HUB_AVAILABLE
+    global HF_TRANSFER_AVAILABLE
+    
     packages_to_check = {
         "hf_transfer": HF_TRANSFER_AVAILABLE,
         "huggingface_hub": HF_HUB_AVAILABLE
@@ -58,7 +61,6 @@ def install_missing_packages():
         if "huggingface_hub" in missing_packages:
             try:
                 from huggingface_hub import hf_hub_download
-                global HF_HUB_AVAILABLE
                 HF_HUB_AVAILABLE = True
             except ImportError:
                 pass
@@ -66,7 +68,6 @@ def install_missing_packages():
         if "hf_transfer" in missing_packages:
             try:
                 import hf_transfer
-                global HF_TRANSFER_AVAILABLE 
                 HF_TRANSFER_AVAILABLE = True
             except ImportError:
                 pass

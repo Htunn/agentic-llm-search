@@ -6,11 +6,33 @@ Python 3.12 Compatibility Check for Agentic LLM Search
 import sys
 import importlib.util
 import subprocess
-from rich.console import Console
-from rich.table import Table
-from rich import print as rprint
 
-console = Console()
+# Check if rich is installed, otherwise use standard output
+try:
+    from rich.console import Console
+    from rich.table import Table
+    from rich import print as rprint
+    RICH_AVAILABLE = True
+    console = Console()
+except ImportError:
+    RICH_AVAILABLE = False
+    print("Note: 'rich' module not found. Install with 'pip install rich' for better formatting.")
+    print("Continuing with standard output...")
+    # Create fallback printing functions
+    class FallbackConsole:
+        def print(self, text, *args, **kwargs):
+            # Strip rich formatting tags
+            text = text.replace('[bold]', '').replace('[/bold]', '')
+            text = text.replace('[bold green]', '').replace('[/bold green]', '')
+            text = text.replace('[bold red]', '').replace('[/bold red]', '')
+            text = text.replace('[bold yellow]', '').replace('[/bold yellow]', '')
+            text = text.replace('[bold cyan]', '').replace('[/bold cyan]', '')
+            text = text.replace('[green]', '').replace('[/green]', '')
+            text = text.replace('[red]', '').replace('[/red]', '')
+            text = text.replace('[yellow]', '').replace('[/yellow]', '')
+            text = text.replace('[cyan]', '').replace('[/cyan]', '')
+            print(text)
+    console = FallbackConsole()
 
 def check_python_version():
     version = sys.version_info
@@ -24,6 +46,10 @@ def check_python_version():
 
 def check_package(package_name):
     try:
+        # Handle special case for beautifulsoup4
+        if package_name == 'beautifulsoup4':
+            package_name = 'bs4'
+        
         spec = importlib.util.find_spec(package_name)
         if spec is None:
             return False, "Not installed"
@@ -47,25 +73,42 @@ def check_dependencies():
     dependencies = [
         "torch", "transformers", "huggingface_hub", "openai", 
         "duckduckgo_search", "beautifulsoup4", "requests",
-        "ctransformers", "hf_transfer"
+        "ctransformers", "hf_transfer", "rich"
     ]
-    
-    table = Table(title="Dependency Check")
-    table.add_column("Package", style="cyan")
-    table.add_column("Status", style="green")
-    table.add_column("Version", style="yellow")
     
     all_installed = True
     
-    for dep in dependencies:
-        installed, version = check_package(dep)
-        status = "[green]✓ Installed[/green]" if installed else "[red]✗ Not installed[/red]"
-        table.add_row(dep, status, version)
+    if RICH_AVAILABLE:
+        table = Table(title="Dependency Check")
+        table.add_column("Package", style="cyan")
+        table.add_column("Status", style="green")
+        table.add_column("Version", style="yellow")
         
-        if not installed:
-            all_installed = False
+        for dep in dependencies:
+            installed, version = check_package(dep)
+            status = "[green]✓ Installed[/green]" if installed else "[red]✗ Not installed[/red]"
+            table.add_row(dep, status, version)
+            
+            if not installed:
+                all_installed = False
+        
+        console.print(table)
+    else:
+        # Fallback table printing without rich
+        console.print("Dependency Check:")
+        console.print("----------------")
+        console.print("Package           Status           Version")
+        console.print("----------------  ---------------  ---------------")
+        
+        for dep in dependencies:
+            installed, version = check_package(dep)
+            status = "✓ Installed" if installed else "✗ Not installed"
+            console.print(f"{dep:<16}  {status:<15}  {version}")
+            
+            if not installed:
+                all_installed = False
+        console.print("----------------  ---------------  ---------------")
     
-    console.print(table)
     return all_installed
 
 def check_tinyllama_model():
@@ -90,8 +133,14 @@ def main():
     deps_installed = check_dependencies()
     console.print("")
     
-    model_exists = check_tinyllama_model()
-    console.print("")
+    try:
+        model_exists = check_tinyllama_model()
+        console.print("")
+    except ImportError:
+        console.print("Cannot check for TinyLlama model without required dependencies.")
+        console.print("Please install dependencies first.")
+        model_exists = False
+        console.print("")
     
     if deps_installed and model_exists:
         console.print("[bold green]✅ All checks passed! Ready for testing.[/bold green]")
@@ -103,6 +152,9 @@ def main():
         if not deps_installed:
             console.print("\nInstall missing dependencies:")
             console.print("[bold]pip install -r requirements.txt[/bold]")
+            if not RICH_AVAILABLE:
+                console.print("\nInstall the 'rich' module for better formatting:")
+                console.print("pip install rich")
         
         if not model_exists:
             console.print("\nDownload the TinyLlama model:")

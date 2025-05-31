@@ -17,15 +17,19 @@ check_python_version() {
 
 # Check for virtual environment
 check_venv() {
-  if [ ! -d "venv" ]; then
-    echo "Virtual environment not found. Creating one..."
-    python3 -m venv venv
-    echo "Activating virtual environment and installing dependencies..."
+  # Check for both venv and .venv directories
+  if [ -d ".venv" ]; then
+    echo "Virtual environment (.venv) found. Activating..."
+    source .venv/bin/activate
+  elif [ -d "venv" ]; then
+    echo "Virtual environment (venv) found. Activating..."
     source venv/bin/activate
-    pip install -r requirements.txt
   else
-    echo "Virtual environment found. Activating..."
-    source venv/bin/activate
+    echo "Virtual environment not found. Creating one..."
+    python3 -m venv .venv
+    echo "Activating virtual environment and installing dependencies..."
+    source .venv/bin/activate
+    pip install -r requirements.txt
   fi
 }
 
@@ -68,7 +72,7 @@ main() {
   case $choice in
     1)
       echo "Starting command line interface..."
-      python test_agentic_search.py
+      python3 test_agentic_search.py
       ;;
     2)
       echo "Starting web interface with Streamlit..."

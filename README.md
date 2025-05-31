@@ -40,13 +40,19 @@ pip install -r requirements.txt
 python download_model.py
 ```
 
-5. Check compatibility with Python 3.12:
+5. Run the setup script to verify environment and install missing dependencies:
+
+```bash
+python setup.py
+```
+
+6. Check compatibility with Python 3.12:
 
 ```bash
 python check_compatibility.py
 ```
 
-6. Verify GPU acceleration support:
+7. Verify GPU acceleration support:
 
 ```bash
 python check_gpu.py
@@ -73,7 +79,25 @@ You can adjust GPU settings in your `.env` file:
 USE_GPU=True          # Set to False to force CPU only
 USE_METAL=True        # For Apple Silicon GPUs 
 CONTEXT_LENGTH=4096   # Increased token context length
+GPU_LAYERS=32         # Number of layers to offload to GPU
 ```
+
+### Performance Benchmarking
+
+To test the performance of the LLM model on your system and compare CPU vs GPU speeds:
+
+```bash
+python benchmark.py
+
+# Customize the benchmark
+python benchmark.py --model ./src/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf --runs 5 --context-length 4096
+```
+
+The benchmark tool measures:
+- Token generation speed
+- Inference time
+- Speedup factor with GPU acceleration
+- System and hardware configuration
 
 ## Usage
 
@@ -344,9 +368,54 @@ MIT
 
 ## Troubleshooting
 
-### Common Issues
+### Diagnostic Tools
 
-#### Model Download Issues
+The project includes a comprehensive suite of diagnostic tools to help you identify and fix issues:
+
+#### System Diagnostics
+
+Run the main diagnostics tool to check your entire system configuration:
+
+```bash
+python diagnostics.py
+```
+
+This tool checks:
+- System information and hardware compatibility
+- GPU configuration and Metal support for Apple Silicon
+- Environment variables and configuration
+- Model files and their status
+- Module structure and implementation
+- Quick functionality test
+
+It provides personalized recommendations based on your specific setup.
+
+#### Log Analysis
+
+Use the log analyzer to diagnose issues from log files:
+
+```bash
+# Analyze the most recent log file
+python analyze_logs.py
+
+# Analyze a specific log file
+python analyze_logs.py --log path/to/logfile.log
+
+# Analyze all log files in a directory
+python analyze_logs.py --dir logs --all
+```
+
+The log analyzer automatically identifies common error patterns and provides targeted solutions.
+
+#### GPU Acceleration Check
+
+To specifically check GPU acceleration support:
+
+```bash
+python check_gpu.py
+```
+
+#### HuggingFace Transfer Issues
 
 If you encounter issues with model downloads:
 
@@ -359,14 +428,13 @@ pip uninstall -y hf_transfer
 pip install hf_transfer==0.1.4
 ```
 
+### Common Issues
+
 #### GPU Acceleration Not Working
 
 If GPU acceleration is not working as expected:
 
 ```bash
-# Check GPU status
-python check_gpu.py
-
 # Force specific configuration in .env
 USE_GPU=True
 USE_METAL=True  # For Apple Silicon
@@ -390,14 +458,6 @@ If the model is crashing due to memory constraints:
 2. Reduce `GPU_LAYERS` setting in `.env`
 3. Set `USE_GPU=False` to use CPU only mode
 4. Adjust batch size with `BATCH_SIZE=1` in `.env`
-
-### Diagnostic Tools
-
-The project includes several diagnostic tools:
-
-- `check_gpu.py`: Verifies GPU acceleration support
-- `install_hf_transfer.py`: Handles HuggingFace dependency issues
-- `src/models/env_setup.py`: Contains environment setup utilities
 
 ## Credits
 
