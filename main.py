@@ -4,6 +4,7 @@ Command-line interface for the Agentic LLM Agent
 
 import asyncio
 import argparse
+import os
 import sys
 from typing import Optional
 from rich.console import Console
@@ -30,6 +31,16 @@ class AgentCLI:
     def initialize_agent(self):
         """Initialize the agent with current config"""
         try:
+            # Log configuration before initializing
+            console.print(f"[bold blue]Model configuration:[/bold blue]")
+            console.print(f"- Model provider: {self.config.model_provider}")
+            console.print(f"- Model name: {self.config.model_name}")
+            
+            # Special logging for Azure OpenAI
+            if self.config.model_provider.lower() == 'azure-openai':
+                console.print(f"- Azure OpenAI Endpoint: {os.getenv('AZURE_OPENAI_ENDPOINT', 'Not set')}")
+                console.print(f"- Azure OpenAI Deployment: {os.getenv('AZURE_OPENAI_DEPLOYMENT', 'Not set')}")
+            
             self.agent = AgenticLLMAgent(
                 model_name=self.config.model_name,
                 model_provider=self.config.model_provider,
@@ -38,6 +49,7 @@ class AgentCLI:
             console.print("[green]✓ Agent initialized successfully![/green]")
         except Exception as e:
             console.print(f"[red]✗ Failed to initialize agent: {str(e)}[/red]")
+            console.print(f"[yellow]Error details: {str(e)}[/yellow]")
             sys.exit(1)
     
     def display_response(self, response: AgentResponse):

@@ -20,19 +20,30 @@ from src import AgentResponse
 console = Console()
 
 async def main():
-    console.print("[bold cyan]Initializing Agentic LLM Search with TinyLlama...[/bold cyan]")
+    # Get model configuration from environment variables
+    model_provider = os.getenv("MODEL_PROVIDER", "huggingface")
+    model_name = os.getenv("DEFAULT_MODEL", "./src/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf")
+    
+    if model_provider.lower() == "azure-openai":
+        console.print("[bold cyan]Initializing Agentic LLM Search with Azure OpenAI...[/bold cyan]")
+        console.print(f"Using model: {model_name}")
+        console.print(f"Using endpoint: {os.getenv('AZURE_OPENAI_ENDPOINT', 'Not set')}")
+        console.print(f"Using deployment: {os.getenv('AZURE_OPENAI_DEPLOYMENT', 'Not set')}")
+    else:
+        console.print("[bold cyan]Initializing Agentic LLM Search with TinyLlama...[/bold cyan]")
     
     # Initialize the agent
     try:
         agent = AgenticLLMAgent(
-            model_name="./src/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf",
-            model_provider="huggingface",
+            model_name=model_name,
+            model_provider=model_provider,
             max_search_results=3,
             enable_search=True
         )
         console.print("[bold green]Agent initialized successfully![/bold green]")
     except Exception as e:
         console.print(f"[bold red]Failed to initialize agent: {str(e)}[/bold red]")
+        console.print(f"[yellow]Error details: {str(e)}[/yellow]")
         return
     
     # Interactive loop

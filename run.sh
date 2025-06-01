@@ -64,12 +64,35 @@ main() {
   
   echo ""
   echo "Starting the application..."
+  echo "Choose a model provider:"
+  echo "1. Local TinyLlama (Default, no API key required)"
+  echo "2. Azure OpenAI (Requires configuration)"
+  read -p "Enter model provider (1-2): " model_choice
+  
+  # Set model provider based on choice
+  if [ "$model_choice" = "2" ]; then
+    echo "Using Azure OpenAI as model provider"
+    export MODEL_PROVIDER=azure-openai
+    export DEFAULT_MODEL=gpt-35-turbo
+    
+    # Ensure Azure OpenAI configuration is set
+    if [ -z "$AZURE_OPENAI_API_KEY" ] || [ -z "$AZURE_OPENAI_ENDPOINT" ]; then
+      echo "Azure OpenAI configuration not found in environment"
+      echo "Using values from .env file if available"
+    fi
+  else
+    echo "Using local TinyLlama as model provider"
+    export MODEL_PROVIDER=huggingface
+    export DEFAULT_MODEL=./src/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf
+  fi
+  
+  echo ""
   echo "Choose an interface:"
   echo "1. Command Line Interface"
   echo "2. Web Interface (Streamlit)"
-  read -p "Enter your choice (1-2): " choice
+  read -p "Enter your choice (1-2): " interface_choice
   
-  case $choice in
+  case $interface_choice in
     1)
       echo "Starting command line interface..."
       python3 test_agentic_search.py

@@ -79,11 +79,15 @@ def main():
         st.header("⚙️ Configuration")
         
         # Model provider selection
-        model_provider = st.radio("Model Provider", ["huggingface", "openai"], index=0)
+        model_provider = st.radio("Model Provider", ["huggingface", "openai", "azure-openai"], index=0)
         
         # Model selection based on provider
         if model_provider == "huggingface":
             model_options = ["./src/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf", "TheBloke/Llama-2-7B-Chat-GGUF", "microsoft/phi-2"]
+        elif model_provider == "azure-openai":
+            # For Azure OpenAI, we should use the model names that match Azure's naming
+            # The actual deployment name will be taken from the environment variable
+            model_options = ["gpt-35-turbo", "gpt-4", "gpt-4-turbo"]
         else:
             model_options = ["gpt-4", "gpt-3.5-turbo", "gpt-4-turbo"]
             
@@ -181,8 +185,8 @@ def main():
     # Footer
     st.markdown("---")
     st.markdown(
-        "Built with ❤️ using Streamlit, OpenAI, and DuckDuckGo Search | "
-        "[GitHub](https://github.com/yourusername/agentic-llm)"
+        "Built with ❤️ using Streamlit, Azure OpenAI, OpenAI, and DuckDuckGo Search | "
+        "[GitHub](https://github.com/Htunn/agentic-llm-search)"
     )
 
 if __name__ == "__main__":

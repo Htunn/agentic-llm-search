@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 
 from src import AgentResponse, SearchResult
 from src.tools.search_tool import InternetSearchTool, SearchQueryOptimizer
-from src.models.llm_models import OpenAIModel, HuggingFaceModel, AgentModelOrchestrator
+from src.models.llm_models import OpenAIModel, HuggingFaceModel, AzureOpenAIModel, AgentModelOrchestrator
 
 # Load environment variables
 load_dotenv()
@@ -44,6 +44,9 @@ class AgenticLLMAgent:
             if self.model_provider.lower() == "huggingface":
                 self.llm_model = HuggingFaceModel(model_name=model_name)
                 logger.info(f"Initialized HuggingFace model: {model_name}")
+            elif self.model_provider.lower() == "azure-openai":
+                self.llm_model = AzureOpenAIModel(model_name=model_name)
+                logger.info(f"Initialized Azure OpenAI model: {model_name}")
             else:
                 self.llm_model = OpenAIModel(model_name=model_name)
                 logger.info(f"Initialized OpenAI model: {model_name}")
@@ -116,6 +119,9 @@ class AgenticLLMAgent:
             if self.model_provider.lower() == "huggingface":
                 self.llm_model = HuggingFaceModel(model_name=model_name)
                 logger.info(f"Updated to HuggingFace model: {model_name}")
+            elif self.model_provider.lower() == "azure-openai":
+                self.llm_model = AzureOpenAIModel(model_name=model_name)
+                logger.info(f"Updated to Azure OpenAI model: {model_name}")
             else:
                 self.llm_model = OpenAIModel(model_name=model_name)
                 logger.info(f"Updated to OpenAI model: {model_name}")
@@ -132,12 +138,17 @@ class AgentConfig:
     
     def __init__(self):
         self.model_name = os.getenv("DEFAULT_MODEL", "./src/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf")
-        self.model_provider = os.getenv("MODEL_PROVIDER", "huggingface") # "openai" or "huggingface"
+        self.model_provider = os.getenv("MODEL_PROVIDER", "huggingface") # "openai", "huggingface", or "azure-openai"
         self.temperature = float(os.getenv("TEMPERATURE", "0.7"))
         self.max_tokens = int(os.getenv("MAX_TOKENS", "2000"))
         self.max_search_results = int(os.getenv("MAX_SEARCH_RESULTS", "5"))
         self.search_engine = os.getenv("SEARCH_ENGINE", "duckduckgo")
         self.max_content_length = int(os.getenv("MAX_CONTENT_LENGTH", "2000"))
+        
+        # Azure OpenAI specific configuration
+        self.azure_openai_api_key = os.getenv("AZURE_OPENAI_API_KEY", os.getenv("OPENAI_API_KEY", ""))
+        self.azure_openai_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "")
+        self.azure_openai_api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2023-05-15")
         self.debug = os.getenv("DEBUG", "False").lower() == "true"
     
     def to_dict(self) -> Dict[str, Any]:

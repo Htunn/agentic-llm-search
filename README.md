@@ -155,6 +155,24 @@ Available OpenAI models:
 - `gpt-4` (higher quality but more expensive)
 - `gpt-4-turbo` (latest version)
 
+### 3. Azure OpenAI Models
+
+To use Azure OpenAI Services (requires Azure OpenAI resource):
+
+```
+# .env file
+DEFAULT_MODEL=gpt-35-turbo  # Should match your Azure OpenAI deployment name
+MODEL_PROVIDER=azure-openai
+AZURE_OPENAI_API_KEY=your_azure_openai_api_key
+AZURE_OPENAI_ENDPOINT=https://your-resource-name.openai.azure.com/
+AZURE_OPENAI_API_VERSION=2023-05-15
+```
+
+Available Azure OpenAI models (deployment names may vary):
+- `gpt-35-turbo` (Azure's GPT-3.5)
+- `gpt-4` (Azure's GPT-4)
+- `gpt-4-turbo` (Azure's GPT-4 Turbo)
+
 ## Usage
 
 ### Command Line Interface

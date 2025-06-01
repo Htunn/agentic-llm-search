@@ -255,13 +255,27 @@ class OpenAIModel(LLMModel):
     def generate_response(self, prompt: str, context: Optional[str] = None) -> str:
         """Generate response using OpenAI GPT"""
         try:
-            messages = [
-                {"role": "system", "content": self._get_system_prompt()},
-                {"role": "user", "content": prompt}
-            ]
+            from openai.types.chat import ChatCompletionSystemMessageParam, ChatCompletionUserMessageParam
             
+            messages = []
+            # Add system message
+            messages.append(ChatCompletionSystemMessageParam(
+                role="system",
+                content=self._get_system_prompt()
+            ))
+            
+            # Add context if provided
             if context:
-                messages.insert(1, {"role": "system", "content": f"Context: {context}"})
+                messages.append(ChatCompletionSystemMessageParam(
+                    role="system",
+                    content=f"Context: {context}"
+                ))
+            
+            # Add user message
+            messages.append(ChatCompletionUserMessageParam(
+                role="user",
+                content=prompt
+            ))
             
             response = self.client.chat.completions.create(
                 model=self.model_name,
@@ -270,7 +284,8 @@ class OpenAIModel(LLMModel):
                 max_tokens=self.max_tokens
             )
             
-            return response.choices[0].message.content
+            content = response.choices[0].message.content
+            return content if content is not None else "No response generated"
             
         except Exception as e:
             logger.error(f"OpenAI API error: {str(e)}")
@@ -292,6 +307,107 @@ Format your response clearly with:
 - Supporting evidence from sources
 - Proper citations
 - Source reliability assessment when relevant"""
+
+class AzureOpenAIModel(OpenAIModel):
+    """Azure OpenAI model wrapper"""
+    
+    def __init__(self, 
+                 model_name: str = "gpt-35-turbo", 
+                 deployment_name: Optional[str] = None,
+                 api_key: Optional[str] = None, 
+                 api_version: Optional[str] = None,
+                 endpoint: Optional[str] = None,
+                 **kwargs):
+        # Use environment variables if parameters not provided
+        api_key = api_key or os.getenv("AZURE_OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
+        api_version = api_version or os.getenv("AZURE_OPENAI_API_VERSION", "2023-05-15")
+        endpoint = endpoint or os.getenv("AZURE_OPENAI_ENDPOINT")
+        # If deployment name not provided, try to get from env or use model_name
+        deployment_name = deployment_name or os.getenv("AZURE_OPENAI_DEPLOYMENT", model_name)
+        
+        # Initialize parent with the API key
+        super().__init__(model_name, api_key, **kwargs)
+        
+        # Store the deployment name separately from the model name
+        self.deployment_name = deployment_name
+        
+        if not endpoint:
+            raise ValueError("Azure OpenAI endpoint is required")
+        
+        # Ensure the endpoint has the correct format (https://...)    
+        if not endpoint.startswith("https://"):
+            endpoint = f"https://{endpoint}"
+        
+        if not endpoint.endswith("/"):
+            endpoint = f"{endpoint}/"
+            
+        # Create Azure OpenAI client instead of standard OpenAI client
+        try:
+            from openai import AzureOpenAI
+            self.client = AzureOpenAI(
+                api_key=self.api_key,
+                api_version=api_version,
+                azure_endpoint=endpoint
+            )
+            logger.info(f"Successfully initialized Azure OpenAI client with endpoint {endpoint}")
+            logger.info(f"Using deployment: {self.deployment_name}")
+        except Exception as e:
+            logger.error(f"Failed to initialize Azure OpenAI client: {str(e)}")
+            raise
+    
+    def generate_response(self, prompt: str, context: Optional[str] = None) -> str:
+        """Generate response using Azure OpenAI"""
+        try:
+            from openai.types.chat import ChatCompletionSystemMessageParam, ChatCompletionUserMessageParam
+            
+            messages = []
+            # Add system message
+            messages.append(ChatCompletionSystemMessageParam(
+                role="system",
+                content=self._get_system_prompt()
+            ))
+            
+            # Add context if provided
+            if context:
+                messages.append(ChatCompletionSystemMessageParam(
+                    role="system",
+                    content=f"Context: {context}"
+                ))
+            
+            # Add user message
+            messages.append(ChatCompletionUserMessageParam(
+                role="user",
+                content=prompt
+            ))
+            
+            logger.info(f"Sending request to Azure OpenAI with deployment: {self.deployment_name}")
+            
+            response = self.client.chat.completions.create(
+                model=self.deployment_name,  # Use the deployment name for Azure
+                messages=messages,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens
+            )
+            
+            content = response.choices[0].message.content
+            return content if content is not None else "No response generated"
+            
+        except Exception as e:
+            error_details = str(e)
+            # Include more detailed debugging information
+            client_info = f"Endpoint: {getattr(self.client, 'azure_endpoint', 'unknown')}, " \
+                          f"API Version: {getattr(self.client, 'api_version', 'unknown')}, " \
+                          f"Model/Deployment: {self.deployment_name}"
+            
+            logger.error(f"Azure OpenAI API error: {error_details}")
+            logger.error(f"Client details: {client_info}")
+            
+            # Return a more informative error message
+            return f"Error generating response: {error_details}\n\nThis might be due to:\n" \
+                   f"1. Incorrect deployment name (current: {self.model_name})\n" \
+                   f"2. Invalid API key or endpoint\n" \
+                   f"3. Incompatible API version\n" \
+                   f"Check the configuration in your .env file."
 
 class AgentModelOrchestrator:
     """Orchestrates the LLM model responses with search results"""
