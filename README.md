@@ -1,6 +1,40 @@
 # Agentic LLM Web Search
 
-An intelligent agent that combines local LLM inference with web search capabilities to provide well-researched answers with proper citations. Optimized for Python 3.12 with TinyLlama and GPU acceleration on Apple Silicon M-series chips.
+An intelligent agent that combines local LLM inference with web search capabilities to provide well-researched answers with proper citations. Optimized for python3 3.12 with TinyLlama and GPU acceleration on Apple Silicon M-series chips.
+
+## Quick Start
+
+1. Clone the repository and create a virtual environment:
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/agentic-llm-search.git
+cd agentic-llm-search
+
+# Create and activate a virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+pip3 install -r requirements.txt
+```
+
+2. Install ctransformers with Metal support (for Apple Silicon Macs):
+```bash
+# Uninstall any existing ctransformers installation
+pip3 uninstall ctransformers --yes
+
+# Reinstall with Metal support
+CT_METAL=1 pip3 install ctransformers --no-binary ctransformers
+```
+
+3. Download the model and run the application:
+```bash
+# Download the TinyLlama model
+python3 download_model.py
+
+# Run the application
+python3 main.py
+```
 
 ## Features
 
@@ -9,7 +43,7 @@ An intelligent agent that combines local LLM inference with web search capabilit
 - **GPU Acceleration**: Support for Apple Silicon M-series GPU acceleration using Metal
 - **OpenAI Integration**: Optionally use OpenAI models for more powerful responses
 - **Citation Support**: Responses include proper citations to search results
-- **Python 3.12 Optimized**: Built to leverage the latest Python features
+- **python3 3.12 Optimized**: Built to leverage the latest python3 features
 - **Content Analysis**: Extract and process content from multiple web sources
 - **Multiple Interfaces**: CLI, Web UI, and API options
 
@@ -21,7 +55,7 @@ git clone https://github.com/yourusername/agentic-llm-search.git
 cd agentic-llm-search
 ```
 
-2. Set up a Python virtual environment:
+2. Set up a python3 virtual environment:
 
 ```bash
 python3 -m venv venv
@@ -31,31 +65,31 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 3. Install dependencies:
 
 ```bash
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 ```
 
 4. Download the TinyLlama model:
 
 ```bash
-python download_model.py
+python3 download_model.py
 ```
 
 5. Run the setup script to verify environment and install missing dependencies:
 
 ```bash
-python setup.py
+python3 setup.py
 ```
 
-6. Check compatibility with Python 3.12:
+6. Check compatibility with python3 3.12:
 
 ```bash
-python check_compatibility.py
+python3 check_compatibility.py
 ```
 
 7. Verify GPU acceleration support:
 
 ```bash
-python check_gpu.py
+python3 check_gpu.py
 ```
 
 ## GPU Acceleration
@@ -70,6 +104,20 @@ On Apple Silicon Macs, the system uses Metal Performance Shaders (MPS) to accele
 - Uses up to 32 GPU-accelerated layers with ctransformers
 - Provides approximately 2-5x speedup compared to CPU-only inference
 - Extended context length (4096 tokens) to avoid token limit warnings
+
+### Installing ctransformers with Metal Support
+
+For optimal performance on macOS with Apple Silicon, install ctransformers with Metal support:
+
+```bash
+# Uninstall any existing ctransformers installation
+pip3 uninstall ctransformers --yes
+
+# Reinstall with Metal support
+CT_METAL=1 pip3 install ctransformers --no-binary ctransformers
+```
+
+This enables GPU acceleration for inference using the Metal framework on Apple Silicon Macs.
 
 ### Configuration
 
@@ -87,10 +135,10 @@ GPU_LAYERS=32         # Number of layers to offload to GPU
 To test the performance of the LLM model on your system and compare CPU vs GPU speeds:
 
 ```bash
-python benchmark.py
+python3 benchmark.py
 
 # Customize the benchmark
-python benchmark.py --model ./src/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf --runs 5 --context-length 4096
+python3 benchmark.py --model ./src/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf --runs 5 --context-length 4096
 ```
 
 The benchmark tool measures:
@@ -106,7 +154,7 @@ The benchmark tool measures:
 Run the interactive test script:
 
 ```bash
-python test_agentic_search.py
+python3 test_agentic_search.py
 ```
 
 Enter your questions when prompted, and the agent will:
@@ -122,7 +170,7 @@ The agent supports two model providers:
 
 To use HuggingFace models (recommended for privacy and no API costs):
 
-```python
+```python3
 # In your code
 agent = AgenticLLMAgent(
     model_name="./src/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf",
@@ -179,12 +227,12 @@ Available Azure OpenAI models (deployment names may vary):
 
 Run the agent in interactive mode:
 ```bash
-python main.py
+python3 main.py
 ```
 
 Or ask a single question:
 ```bash
-python main.py "What are the latest developments in AI?"
+python3 main.py "What are the latest developments in AI?"
 ```
 
 Additional CLI options:
@@ -208,7 +256,7 @@ Then open your browser at http://localhost:8501.
 
 Start the FastAPI server:
 ```bash
-python -m uvicorn api:app --reload
+python3 -m uvicorn api:app --reload
 ```
 
 Then access the API at http://localhost:8000 or view the API documentation at http://localhost:8000/docs.
@@ -395,7 +443,7 @@ The project includes a comprehensive suite of diagnostic tools to help you ident
 Run the main diagnostics tool to check your entire system configuration:
 
 ```bash
-python diagnostics.py
+python3 diagnostics.py
 ```
 
 This tool checks:
@@ -414,13 +462,13 @@ Use the log analyzer to diagnose issues from log files:
 
 ```bash
 # Analyze the most recent log file
-python analyze_logs.py
+python3 analyze_logs.py
 
 # Analyze a specific log file
-python analyze_logs.py --log path/to/logfile.log
+python3 analyze_logs.py --log path/to/logfile.log
 
 # Analyze all log files in a directory
-python analyze_logs.py --dir logs --all
+python3 analyze_logs.py --dir logs --all
 ```
 
 The log analyzer automatically identifies common error patterns and provides targeted solutions.
@@ -430,7 +478,7 @@ The log analyzer automatically identifies common error patterns and provides tar
 To specifically check GPU acceleration support:
 
 ```bash
-python check_gpu.py
+python3 check_gpu.py
 ```
 
 #### HuggingFace Transfer Issues
@@ -439,11 +487,11 @@ If you encounter issues with model downloads:
 
 ```bash
 # Run the hf_transfer diagnostics tool
-python install_hf_transfer.py --diagnose
+python3 install_hf_transfer.py --diagnose
 
 # Force reinstall hf_transfer
-pip uninstall -y hf_transfer
-pip install hf_transfer==0.1.4
+pip3 uninstall -y hf_transfer
+pip3 install hf_transfer==0.1.4
 ```
 
 ### Common Issues
@@ -479,4 +527,4 @@ If the model is crashing due to memory constraints:
 
 ## Credits
 
-Built with Python, OpenAI, HuggingFace, DuckDuckGo Search, FastAPI, and Streamlit.
+Built with python3, OpenAI, HuggingFace, DuckDuckGo Search, FastAPI, and Streamlit.
