@@ -108,6 +108,19 @@ def main():
     
     # Initialize agent
     try:
+        # For Azure OpenAI, ensure we're using the deployment name from environment variables
+        if model_provider == "azure-openai":
+            # Display Azure OpenAI configuration info in the UI
+            azure_deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "Not set")
+            azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "Not set")
+            st.sidebar.info(f"Using Azure OpenAI\nDeployment: {azure_deployment}\nEndpoint: {azure_endpoint}")
+            
+            # Check if deployment name is configured
+            if not azure_deployment:
+                st.error("Azure OpenAI deployment name is not configured in .env file")
+                st.info("Please set AZURE_OPENAI_DEPLOYMENT in your .env file")
+                return
+        
         agent = initialize_agent(selected_model, model_provider)
         agent.set_search_enabled(enable_search)
         if hasattr(agent, 'max_search_results'):

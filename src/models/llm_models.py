@@ -344,6 +344,10 @@ class AzureOpenAIModel(OpenAIModel):
         # Create Azure OpenAI client instead of standard OpenAI client
         try:
             from openai import AzureOpenAI
+            
+            # Log the actual values being used for debugging
+            logger.info(f"Initializing Azure OpenAI with API version: {api_version}, Endpoint: {endpoint}, Deployment: {deployment_name}")
+            
             self.client = AzureOpenAI(
                 api_key=self.api_key,
                 api_version=api_version,
@@ -404,7 +408,7 @@ class AzureOpenAIModel(OpenAIModel):
             
             # Return a more informative error message
             return f"Error generating response: {error_details}\n\nThis might be due to:\n" \
-                   f"1. Incorrect deployment name (current: {self.model_name})\n" \
+                   f"1. Incorrect deployment name (current: {self.deployment_name})\n" \
                    f"2. Invalid API key or endpoint\n" \
                    f"3. Incompatible API version\n" \
                    f"Check the configuration in your .env file."
