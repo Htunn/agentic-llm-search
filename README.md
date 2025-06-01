@@ -223,6 +223,24 @@ Available Azure OpenAI models (deployment names may vary):
 
 ## Usage
 
+### Using run.sh Script (Recommended)
+
+The easiest way to use the application is with the included `run.sh` script, which handles environment setup, model checking, and provides a simple interface:
+
+```bash
+# Make the script executable if needed
+chmod +x run.sh
+
+# Run the application
+./run.sh
+```
+
+The script will:
+1. Check for Python 3.12+ and set up a virtual environment
+2. Verify the model is downloaded or download it if missing
+3. Let you choose a model provider (Local TinyLlama or Azure OpenAI)
+4. Let you select between CLI and Web Interface
+
 ### Command Line Interface
 
 Run the agent in interactive mode:
@@ -238,7 +256,7 @@ python3 main.py "What are the latest developments in AI?"
 Additional CLI options:
 ```
 --model MODEL         LLM model to use (default: ./src/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf)
---provider PROVIDER   Model provider to use (choices: huggingface, openai)
+--provider PROVIDER   Model provider to use (choices: huggingface, openai, azure-openai)
 --no-search           Disable internet search
 --max-results MAX     Maximum search results to use (default: 5)
 ```
