@@ -85,7 +85,20 @@ def main():
         
         # Model selection based on provider
         if model_provider == "huggingface":
-            model_options = ["./src/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf", "TheBloke/Llama-2-7B-Chat-GGUF", "microsoft/phi-2"]
+            # Check which model files are available in the models directory
+            model_files = []
+            model_dir = "./src/models"
+            if os.path.exists(model_dir):
+                for file in os.listdir(model_dir):
+                    if file.endswith(".gguf"):
+                        model_files.append(f"./src/models/{file}")
+            
+            # If no GGUF files found, show default options
+            if not model_files:
+                model_files = ["./src/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf"]
+            
+            # Add remote model options
+            model_options = model_files + ["TheBloke/Llama-2-7B-Chat-GGUF", "microsoft/phi-2"]
         elif model_provider == "azure-openai":
             # For Azure OpenAI, we should use the model names that match Azure's naming
             # The actual deployment name will be taken from the environment variable

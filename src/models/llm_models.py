@@ -55,8 +55,23 @@ class LLMModel:
         raise NotImplementedError
 
 class HuggingFaceModel(LLMModel):
-    """HuggingFace model wrapper for local LLMs"""
+    """HuggingFace model wrapper for local LLMs supporting various architectures"""
     
+    # Mapping of model files to appropriate architectures and tokenizers
+    MODEL_CONFIG = {
+        "tinyllama": {
+            "model_type": "llama",
+            "tokenizer": "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+        },
+        "llama-3": {
+            "model_type": "llama",
+            "tokenizer": "meta-llama/Llama-3-8B-Instruct"
+        },
+        "phi-3": {
+            "model_type": "mistral",
+            "tokenizer": "microsoft/phi-3-mini-4k-instruct"
+        }
+    }
 
     def __init__(self, model_name: str = "./src/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf", **kwargs):
         # HuggingFace models don't need an API key for inference
@@ -75,6 +90,31 @@ class HuggingFaceModel(LLMModel):
                 # Use CTransformers for GGUF models
                 logger.info("Using CTransformers for GGUF model")
                 
+                # Determine model type and tokenizer based on filename
+                model_type = "llama"  # Default model type
+                tokenizer_name = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"  # Default tokenizer
+                
+                # Check filename to determine model type
+                filename = os.path.basename(model_name).lower()
+                
+                # Detect model type from filename
+                if any(name in filename for name in ["llama-3", "llama3"]):
+                    model_type = "llama"
+                    tokenizer_name = "meta-llama/Llama-3-8B-Instruct"
+                    logger.info("Detected Llama 3 model")
+                elif any(name in filename for name in ["phi-3", "phi3"]):
+                    model_type = "mistral"  # Phi-3 uses Mistral architecture in GGUF
+                    tokenizer_name = "microsoft/phi-3-mini-4k-instruct"
+                    logger.info("Detected Phi-3 model")
+                elif any(name in filename for name in ["llama-2", "llama2"]):
+                    model_type = "llama"
+                    tokenizer_name = "meta-llama/Llama-2-7B-Chat-hf"
+                    logger.info("Detected Llama 2 model")
+                elif "tinyllama" in filename:
+                    model_type = "llama"
+                    tokenizer_name = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+                    logger.info("Detected TinyLlama model")
+                
                 # Check for Apple Silicon to use Metal GPU acceleration
                 import platform
                 is_apple_silicon = (platform.system() == "Darwin" and 
@@ -86,7 +126,7 @@ class HuggingFaceModel(LLMModel):
                     # Set GPU layers for M-series chips
                     self.model = CTModelForCausalLM.from_pretrained(
                         model_name,
-                        model_type="llama",
+                        model_type=model_type,
                         hf=True,  # Use Hugging Face format
                         context_length=4096,  # Increased context length (default is 2048)
                         gpu_layers=32  # Send most layers to GPU for M-series chips
@@ -95,14 +135,15 @@ class HuggingFaceModel(LLMModel):
                     logger.info("Using CPU acceleration only")
                     self.model = CTModelForCausalLM.from_pretrained(
                         model_name,
-                        model_type="llama",
+                        model_type=model_type,
                         hf=True,  # Use Hugging Face format
                         context_length=4096,  # Increased context length (default is 2048)
                         gpu_layers=0  # CPU only
                     )
                 
                 # Load tokenizer from Hugging Face
-                self.tokenizer = AutoTokenizer.from_pretrained("TinyLlama/TinyLlama-1.1B-Chat-v1.0")
+                logger.info(f"Loading tokenizer: {tokenizer_name}")
+                self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
                 
             else:
                 # Use standard HuggingFace transformers
