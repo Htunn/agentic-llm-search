@@ -119,13 +119,13 @@ class SearchQueryOptimizer:
     """Optimizes search queries for better results"""
     
     @staticmethod
-    def optimize_query(original_query: str, context: Optional[str] = None) -> str:
+    def optimize_query(original_query: str, additional_context: Optional[str] = None) -> str:
         """
         Optimize search query for better results
         
         Args:
             original_query: Original user query
-            context: Additional context to improve search
+            additional_context: Additional context for follow-up questions or clarification
             
         Returns:
             Optimized search query
@@ -135,6 +135,34 @@ class SearchQueryOptimizer:
         
         # Basic query optimization
         optimized = original_query.strip()
+        
+        # Handle follow-up questions using additional context
+        if additional_context:
+            # This is likely a follow-up question, extract key terms from both
+            # the original query and the additional context
+            
+            # Check for pronouns that need resolution
+            pronouns = ["it", "this", "that", "these", "those", "they", "them", "their", "its"]
+            has_pronouns = any(pronoun in optimized.lower().split() for pronoun in pronouns)
+            
+            # If we have pronouns and context, try to make the query more specific
+            if has_pronouns:
+                # Extract important terms from the context (simple approach)
+                context_words = additional_context.lower().split()
+                # Filter stop words and short words
+                stop_words = ["a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for", "with", "by", "about", "of"]
+                key_terms = [word for word in context_words if word not in stop_words and len(word) > 3]
+                
+                # Get most frequent important terms (simple approach)
+                from collections import Counter
+                term_counts = Counter(key_terms)
+                top_terms = [term for term, count in term_counts.most_common(3)]
+                
+                # Create a more specific query by adding these terms
+                if top_terms:
+                    original_terms = optimized.split()
+                    optimized = f"{optimized} {' '.join(term for term in top_terms if term not in original_terms)}"
+                    logger.info(f"Enhanced follow-up query with context: {optimized}")
         
         # Add year for time-sensitive queries
         time_sensitive_keywords = ["latest", "recent", "current", "new", "today", "2024", "2025"]

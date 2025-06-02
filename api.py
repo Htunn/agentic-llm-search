@@ -11,12 +11,48 @@ import logging
 import uvicorn
 import os
 from dotenv import load_dotenv
+import uuid
 
 from src.agents.agentic_llm import AgenticLLMAgent, AgentConfig
 from src import AgentResponse, SearchResult
 
 # Load environment variables
 load_dotenv()
+
+# Conversation management
+class ConversationManager:
+    """Manages multiple conversations for the API"""
+    
+    def __init__(self):
+        self.conversations: Dict[str, AgenticLLMAgent] = {}
+        
+    def create_conversation(self, model_name: str, model_provider: str, max_results: int = 5) -> str:
+        """Create a new conversation with a dedicated agent"""
+        conversation_id = str(uuid.uuid4())
+        self.conversations[conversation_id] = AgenticLLMAgent(
+            model_name=model_name,
+            model_provider=model_provider,
+            max_search_results=max_results,
+            enable_memory=True
+        )
+        logger.info(f"Created new conversation: {conversation_id}")
+        return conversation_id
+    
+    def get_agent(self, conversation_id: str) -> Optional[AgenticLLMAgent]:
+        """Get the agent for a conversation"""
+        return self.conversations.get(conversation_id)
+    
+    def remove_conversation(self, conversation_id: str):
+        """Remove a conversation"""
+        if conversation_id in self.conversations:
+            del self.conversations[conversation_id]
+            logger.info(f"Removed conversation: {conversation_id}")
+    
+    def cleanup_old_conversations(self, max_age_minutes: int = 60):
+        """Remove conversations older than the specified age"""
+        # This would require tracking last activity time for each conversation
+        # Implementation omitted for brevity
+        pass
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -41,12 +77,17 @@ app.add_middleware(
 # Global agent instance
 agent: Optional[AgenticLLMAgent] = None
 
+# Global conversation manager
+conversation_manager = ConversationManager()
+
 # Request/Response models
 class QueryRequest(BaseModel):
     query: str
     search_type: str = "web"
     enable_search: bool = True
     max_results: Optional[int] = 5
+    conversation_id: Optional[str] = None
+    enable_memory: bool = True
 
 class SearchResultResponse(BaseModel):
     title: str
@@ -135,17 +176,29 @@ async def get_config():
 @app.post("/query", response_model=AgentResponseModel)
 async def process_query(request: QueryRequest):
     """Process a user query"""
-    if not agent:
-        raise HTTPException(status_code=503, detail="Agent not initialized")
+    # Determine which agent to use
+    current_agent = None
+    
+    if request.conversation_id:
+        # Use conversation-specific agent if a conversation ID is provided
+        current_agent = conversation_manager.get_agent(request.conversation_id)
+        if not current_agent:
+            raise HTTPException(status_code=404, detail=f"Conversation {request.conversation_id} not found")
+    else:
+        # Use the global agent if no conversation ID is provided
+        current_agent = agent
+        if not current_agent:
+            raise HTTPException(status_code=503, detail="Agent not initialized")
     
     try:
         # Update agent settings
-        agent.set_search_enabled(request.enable_search)
+        current_agent.set_search_enabled(request.enable_search)
+        current_agent.set_memory_enabled(request.enable_memory)
         if request.max_results:
-            agent.max_search_results = request.max_results
+            current_agent.max_search_results = request.max_results
         
         # Process the query
-        response = await agent.process_query(request.query, request.search_type)
+        response = await current_agent.process_query(request.query, request.search_type)
         
         # Convert to response model
         sources_response = [
@@ -221,6 +274,60 @@ async def update_model(model_name: str, model_provider: Optional[str] = None):
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error updating model: {str(e)}")
+
+# Conversation management endpoints
+@app.post("/conversations", response_model=Dict[str, str])
+async def create_conversation(
+    model_name: Optional[str] = None, 
+    model_provider: Optional[str] = None
+):
+    """Create a new conversation"""
+    config = AgentConfig()
+    conversation_id = conversation_manager.create_conversation(
+        model_name=model_name or config.model_name,
+        model_provider=model_provider or config.model_provider,
+        max_results=config.max_search_results
+    )
+    return {"conversation_id": conversation_id}
+
+@app.delete("/conversations/{conversation_id}")
+async def delete_conversation(conversation_id: str):
+    """Delete a conversation"""
+    if conversation_manager.get_agent(conversation_id):
+        conversation_manager.remove_conversation(conversation_id)
+        return {"message": f"Conversation {conversation_id} deleted"}
+    else:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+@app.post("/conversations/{conversation_id}/clear")
+async def clear_conversation_memory(conversation_id: str):
+    """Clear conversation memory"""
+    agent = conversation_manager.get_agent(conversation_id)
+    if agent:
+        agent.clear_memory()
+        return {"message": "Conversation memory cleared"}
+    else:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+@app.get("/conversations/{conversation_id}/history")
+async def get_conversation_history(conversation_id: str):
+    """Get conversation history"""
+    agent = conversation_manager.get_agent(conversation_id)
+    if agent and agent.enable_memory:
+        messages = agent.get_conversation_history()
+        return {
+            "conversation_id": conversation_id,
+            "messages": [
+                {
+                    "role": msg.role,
+                    "content": msg.content,
+                    "timestamp": msg.timestamp.isoformat()
+                }
+                for msg in messages
+            ]
+        }
+    else:
+        raise HTTPException(status_code=404, detail="Conversation not found or memory disabled")
 
 # Example usage endpoints
 @app.get("/examples", response_model=List[str])

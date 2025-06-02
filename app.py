@@ -23,7 +23,7 @@ st.set_page_config(
 )
 
 @st.cache_resource
-def initialize_agent(model_name=None, model_provider=None):
+def initialize_agent(model_name=None, model_provider=None, max_memory=10, enable_memory=True):
     """Initialize the agent (cached)"""
     config = AgentConfig()
     
@@ -36,7 +36,9 @@ def initialize_agent(model_name=None, model_provider=None):
     return AgenticLLMAgent(
         model_name=config.model_name,
         model_provider=config.model_provider,
-        max_search_results=config.max_search_results
+        max_search_results=config.max_search_results,
+        enable_memory=enable_memory,
+        max_memory=max_memory
     )
 
 def display_response(response: AgentResponse):
@@ -97,7 +99,20 @@ def main():
         enable_search = st.checkbox("Enable Internet Search", value=True)
         max_results = st.slider("Max Search Results", min_value=1, max_value=10, value=5)
         
+        # Memory settings
+        st.markdown("---")
+        st.markdown("### 🧠 Conversation Memory")
+        enable_memory = st.checkbox("Enable Conversation Memory", value=True)
+        max_memory = st.slider("Max Memory Exchanges", min_value=1, max_value=20, value=10)
+        
+        # Clear memory button
+        if st.button("🗑️ Clear Conversation Memory"):
+            if "agent" in st.session_state and hasattr(st.session_state.agent, "clear_memory"):
+                st.session_state.agent.clear_memory()
+                st.success("Conversation memory cleared!")
+        
         # Search type
+        st.markdown("---")
         search_type = st.radio("Search Type", ["web", "news"], index=0)
         
         st.markdown("---")
@@ -121,10 +136,14 @@ def main():
                 st.info("Please set AZURE_OPENAI_DEPLOYMENT in your .env file")
                 return
         
-        agent = initialize_agent(selected_model, model_provider)
+        agent = initialize_agent(selected_model, model_provider, max_memory, enable_memory)
         agent.set_search_enabled(enable_search)
+        agent.set_memory_enabled(enable_memory)
         if hasattr(agent, 'max_search_results'):
             agent.max_search_results = max_results
+        
+        # Store the agent in the session state for buttons to use
+        st.session_state.agent = agent
     except Exception as e:
         st.error(f"Failed to initialize agent: {str(e)}")
         st.info("Please make sure you have set up your API keys in the .env file")
@@ -194,6 +213,20 @@ def main():
                 st.markdown(f"**Answer:** {item['response'].answer[:200]}...")
                 if item['response'].sources:
                     st.markdown(f"**Sources:** {len(item['response'].sources)} found")
+    
+    # Show conversation memory
+    if agent.enable_memory and agent.memory.messages:
+        st.markdown("---")
+        st.markdown("### 🧠 Conversation Context")
+        
+        with st.expander("Show current conversation memory", expanded=False):
+            messages = agent.memory.get_conversation_history()
+            for msg in messages:
+                if msg.role == "user":
+                    st.markdown(f"**👤 You:** {msg.content}")
+                else:
+                    st.markdown(f"**🤖 Agent:** {msg.content[:100]}..." if len(msg.content) > 100 else f"**🤖 Agent:** {msg.content}")
+                st.markdown("---")
     
     # Footer
     st.markdown("---")

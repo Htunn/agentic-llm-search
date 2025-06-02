@@ -419,22 +419,40 @@ class AgentModelOrchestrator:
     def __init__(self, llm_model: LLMModel):
         self.llm_model = llm_model
         
-    def generate_research_response(self, query: str, search_results: List[SearchResult]) -> AgentResponse:
+    def generate_research_response(
+        self, 
+        query: str, 
+        search_results: List[SearchResult],
+        conversation_history: Optional[str] = None,
+        is_follow_up: bool = False
+    ) -> AgentResponse:
         """
         Generate a research response using the LLM model and search results
         
         Args:
             query: User's original query
             search_results: List of search results
+            conversation_history: Previous conversation history for context
+            is_follow_up: Whether this query is a follow-up question
             
         Returns:
             AgentResponse with answer and sources
         """
         try:
-            # Format search results for context
-            context = self._format_search_results(search_results)
+            # Format all the context information
+            search_context = self._format_search_results(search_results)
             
-            # Generate response
+            # Combine search results with conversation history if available
+            if conversation_history:
+                context = f"{conversation_history}\n\n{search_context}"
+                
+                # Add special instruction for follow-up questions
+                if is_follow_up:
+                    context += "\n\nThis appears to be a follow-up question. Use the conversation history and search results to provide a comprehensive and contextual response."
+            else:
+                context = search_context
+            
+            # Generate response with the combined context
             answer = self.llm_model.generate_response(query, context)
             
             # Create response object

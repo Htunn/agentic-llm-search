@@ -44,7 +44,9 @@ class AgentCLI:
             self.agent = AgenticLLMAgent(
                 model_name=self.config.model_name,
                 model_provider=self.config.model_provider,
-                max_search_results=self.config.max_search_results
+                max_search_results=self.config.max_search_results,
+                enable_memory=True,
+                max_memory=int(os.getenv("MAX_MEMORY", "10"))
             )
             console.print("[green]✓ Agent initialized successfully![/green]")
         except Exception as e:
@@ -83,6 +85,8 @@ class AgentCLI:
             "• /help - Show help\n"
             "• /config - Show configuration\n"
             "• /search on/off - Enable/disable search\n"
+            "• /memory on/off - Enable/disable conversation memory\n"
+            "• /clear - Clear conversation history\n"
             "• /exit - Exit the application",
             title="Welcome",
             border_style="green"
@@ -115,6 +119,20 @@ class AgentCLI:
                             self.agent.set_search_enabled(False)
                             console.print("[yellow]⚠ Search disabled[/yellow]")
                     continue
+                elif query.lower().startswith('/memory'):
+                    parts = query.lower().split()
+                    if len(parts) > 1:
+                        if parts[1] == 'on':
+                            self.agent.set_memory_enabled(True)
+                            console.print("[green]✓ Conversation memory enabled[/green]")
+                        elif parts[1] == 'off':
+                            self.agent.set_memory_enabled(False)
+                            console.print("[yellow]⚠ Conversation memory disabled[/yellow]")
+                    continue
+                elif query.lower() == '/clear':
+                    self.agent.clear_memory()
+                    console.print("[green]✓ Conversation memory cleared[/green]")
+                    continue
                 
                 # Process the query
                 console.print("[dim]🔍 Searching and analyzing...[/dim]")
@@ -136,6 +154,8 @@ class AgentCLI:
         • [cyan]/help[/cyan] - Show this help message
         • [cyan]/config[/cyan] - Show current configuration
         • [cyan]/search on/off[/cyan] - Enable or disable internet search
+        • [cyan]/memory on/off[/cyan] - Enable or disable conversation memory
+        • [cyan]/clear[/cyan] - Clear conversation memory
         • [cyan]/exit[/cyan] - Exit the application
         
         [bold]Usage:[/bold]
@@ -160,6 +180,7 @@ class AgentCLI:
         • Max Tokens: {self.config.max_tokens}
         • Max Search Results: {self.config.max_search_results}
         • Search Engine: {self.config.search_engine}
+        • Memory Enabled: {getattr(self.agent, 'enable_memory', False)}
         • Debug Mode: {self.config.debug}
         """
         console.print(Panel(config_text, title="Configuration", border_style="yellow"))
