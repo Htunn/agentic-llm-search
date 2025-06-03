@@ -181,3 +181,133 @@ FOFA uses a credit system called "F-points" for API usage:
 - Do not use this tool to access systems without permission
 - Always respect privacy and legal restrictions
 - Be aware that API usage may be rate-limited based on your FOFA account level
+
+## Architecture Diagrams
+
+### Component Diagram
+
+```mermaid
+graph TD
+    User[User] --> |Input| App[Streamlit App]
+    User --> |Input| CLI[FOFA CLI]
+    
+    subgraph "Interface Layer"
+        App
+        CLI
+    end
+    
+    subgraph "Agent Layer"
+        Agent[AgenticLLMAgent]
+    end
+    
+    subgraph "Tools Layer"
+        SearchTool[InternetSearchTool]
+        FofaTool[FofaSearchTool]
+    end
+    
+    subgraph "External API"
+        FOFAAPI[FOFA API]
+    end
+    
+    App --> |Query| Agent
+    CLI --> |Query| Agent
+    CLI --> |Direct| FofaTool
+    
+    Agent --> |Search| SearchTool
+    Agent --> |Host Lookup| FofaTool
+    SearchTool --> |FOFA Specific Queries| FofaTool
+    
+    FofaTool --> |API Requests| FOFAAPI
+    FOFAAPI --> |Results| FofaTool
+    FofaTool --> |Results| SearchTool
+    FofaTool --> |Results| Agent
+    SearchTool --> |Results| Agent
+    Agent --> |Response| App
+    Agent --> |Response| CLI
+```
+
+### Sequence Diagram: Search Process
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant CLI as FOFA CLI
+    participant Agent as AgenticLLMAgent
+    participant SearchTool as InternetSearchTool
+    participant FofaTool as FofaSearchTool
+    participant API as FOFA API
+    
+    alt Direct CLI Usage
+        User->>CLI: fofa_cli.py search "query"
+        CLI->>FofaTool: search(query, limit)
+        FofaTool->>API: HTTP Request (search)
+        API->>FofaTool: JSON Response
+        FofaTool->>CLI: Formatted Results
+        CLI->>User: Display Results
+    else Agent-Based Analysis
+        User->>CLI: fofa_cli.py search "query" --agent
+        CLI->>Agent: process_fofa_query(query)
+        Agent->>SearchTool: fofa_search(query)
+        SearchTool->>FofaTool: search(query)
+        FofaTool->>API: HTTP Request (search)
+        API->>FofaTool: JSON Response
+        FofaTool->>SearchTool: Structured Results
+        SearchTool->>Agent: Search Results
+        Agent->>Agent: Analyze with LLM
+        Agent->>CLI: Analysis Response
+        CLI->>User: Display Analysis
+    end
+```
+
+### Sequence Diagram: Host Lookup Process
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant CLI as FOFA CLI
+    participant Agent as AgenticLLMAgent
+    participant FofaTool as FofaSearchTool
+    participant API as FOFA API
+    
+    alt Direct CLI Usage
+        User->>CLI: fofa_cli.py host "IP"
+        CLI->>FofaTool: host_info(ip)
+        FofaTool->>API: HTTP Request (search with IP filter)
+        API->>FofaTool: JSON Response
+        FofaTool->>CLI: Structured Host Info
+        CLI->>User: Display Host Info
+    else Agent-Based Analysis
+        User->>CLI: fofa_cli.py host "IP" --agent
+        CLI->>Agent: process_fofa_host(ip)
+        Agent->>FofaTool: host_info(ip)
+        FofaTool->>API: HTTP Request (search with IP filter)
+        API->>FofaTool: JSON Response
+        FofaTool->>Agent: Host Information
+        Agent->>Agent: Analyze with LLM
+        Agent->>CLI: Analysis Response
+        CLI->>User: Display Analysis
+    end
+```
+
+### Deployment Diagram
+
+```mermaid
+graph TD
+    subgraph "User Environment"
+        CLI[FOFA CLI]
+        APP[Streamlit Web App]
+        LLM[LLM Model]
+    end
+    
+    subgraph "FOFA Cloud Service"
+        API[FOFA API]
+        DB[(FOFA Database)]
+    end
+    
+    CLI --> |HTTPS Requests| API
+    APP --> |HTTPS Requests| API
+    API --> DB
+    
+    CLI --> |Local Processing| LLM
+    APP --> |Local Processing| LLM
+```
