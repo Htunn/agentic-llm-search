@@ -39,7 +39,7 @@ python3 main.py
 ## Features
 
 - **Internet Search**: Fetch and process information from the web using DuckDuckGo search
-- **Shodan Integration**: Search for internet-connected devices and services using Shodan
+- **Shodan and FOFA Integration**: Search for internet-connected devices and services using Shodan and FOFA
 - **Local LLM Inference**: Use TinyLlama for efficient inference on your local machine
 - **GPU Acceleration**: Support for Apple Silicon M-series GPU acceleration using Metal
 - **OpenAI Integration**: Optionally use OpenAI models for more powerful responses
@@ -52,6 +52,7 @@ python3 main.py
 
 - [Main README](README.md): Overview and general usage
 - [Shodan Integration](SHODAN_INTEGRATION.md): Using the Shodan search capabilities
+- [FOFA Integration](FOFA_INTEGRATION.md): Using the Fofa search capabilities
 - [Multi-Model Support](MULTI_MODEL_SUPPORT.md): Working with different LLM models
 - [Implementation Details](IMPLEMENTATION_SUMMARY.md): Technical details on the implementation
 - [Improvements](IMPROVEMENTS.md): Planned future improvements
