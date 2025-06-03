@@ -99,6 +99,20 @@ def main():
         enable_search = st.checkbox("Enable Internet Search", value=True)
         max_results = st.slider("Max Search Results", min_value=1, max_value=10, value=5)
         
+        # FOFA configuration
+        st.markdown("---")
+        st.markdown("### 🌐 FOFA Integration")
+        # Check if FOFA API credentials are available
+        fofa_email = os.getenv("FOFA_EMAIL")
+        fofa_api_key = os.getenv("FOFA_API_KEY")
+        if fofa_email and fofa_api_key:
+            st.success("FOFA API credentials are configured")
+            enable_fofa = st.checkbox("Enable FOFA Search", value=True)
+        else:
+            st.warning("FOFA API credentials not found")
+            st.info("Add FOFA_EMAIL and FOFA_API_KEY to your .env file to enable FOFA search capabilities")
+            enable_fofa = st.checkbox("Enable FOFA Search", value=False, disabled=True)
+        
         # Memory settings
         st.markdown("---")
         st.markdown("### 🧠 Conversation Memory")
@@ -113,7 +127,16 @@ def main():
         
         # Search type
         st.markdown("---")
-        search_type = st.radio("Search Type", ["web", "news"], index=0)
+        st.markdown("### 🔍 Search Options")
+        search_type = st.radio("Search Type", ["web", "news", "fofa"], 
+                              index=0,
+                              help="Select 'fofa' to search for internet-connected devices and services")
+                              
+        # Show FOFA specific inputs if selected
+        if search_type == "fofa":
+            fofa_search_type = st.radio("FOFA Search Type", ["Query", "Host Lookup"], index=0)
+            if fofa_search_type == "Host Lookup":
+                st.info("For Host Lookup, please enter an IP address in the main search box")
         
         st.markdown("---")
         st.markdown("### 📊 Session Stats")
@@ -160,14 +183,31 @@ def main():
     with col1:
         ask_button = st.button("🔍 Ask", type="primary")
     
-    # Example queries
+    # Example queries - adjust based on selected search type
     st.markdown("### 💡 Example Queries")
-    examples = [
-        "What are the latest developments in artificial intelligence?",
-        "How does quantum computing work?",
-        "What happened in tech news today?",
-        "Explain the current state of renewable energy technology"
-    ]
+    
+    if search_type == "fofa":
+        if fofa_search_type == "Host Lookup":
+            examples = [
+                "8.8.8.8",  # Google DNS
+                "1.1.1.1",  # Cloudflare DNS
+                "140.82.121.4",  # GitHub
+                "13.107.42.16"   # Microsoft
+            ]
+        else:
+            examples = [
+                "domain=example.com",
+                "cert=\"google.com\"",
+                "title=\"admin login\"",
+                "country=US && port=3389"
+            ]
+    else:
+        examples = [
+            "What are the latest developments in artificial intelligence?",
+            "How does quantum computing work?",
+            "What happened in tech news today?",
+            "Explain the current state of renewable energy technology"
+        ]
     
     cols = st.columns(2)
     for i, example in enumerate(examples):
@@ -182,8 +222,31 @@ def main():
         
         with st.spinner("🔍 Searching and analyzing..."):
             try:
-                # Process the query
-                response = agent.process_query_sync(query, search_type)
+                # Process the query based on search type
+                if search_type == "fofa":
+                    # Handle FOFA searches
+                    if not (os.getenv("FOFA_EMAIL") and os.getenv("FOFA_API_KEY")):
+                        st.error("FOFA API credentials not configured. Please add FOFA_EMAIL and FOFA_API_KEY to your .env file.")
+                        return
+                    
+                    # Determine which FOFA search type to use
+                    if fofa_search_type == "Host Lookup":
+                        # Check if the input looks like an IP address
+                        import re
+                        ip_pattern = re.compile(r'^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$')
+                        if ip_pattern.match(query):
+                            st.info(f"Looking up FOFA information for IP: {query}")
+                            response = agent.process_fofa_host_sync(query)
+                        else:
+                            st.warning("Please enter a valid IP address for Host Lookup")
+                            return
+                    else:
+                        # Regular FOFA search
+                        st.info(f"Searching FOFA for: {query}")
+                        response = agent.process_fofa_query_sync(query)
+                else:
+                    # Regular web or news search
+                    response = agent.process_query_sync(query, search_type)
                 
                 # Display results
                 st.markdown("---")
@@ -231,7 +294,7 @@ def main():
     # Footer
     st.markdown("---")
     st.markdown(
-        "Built with ❤️ using Streamlit, Azure OpenAI, OpenAI, and DuckDuckGo Search | "
+        "Built with ❤️ using Streamlit, Azure OpenAI, OpenAI, DuckDuckGo Search, and FOFA | "
         "[GitHub](https://github.com/Htunn/agentic-llm-search)"
     )
 
