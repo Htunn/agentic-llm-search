@@ -8,11 +8,22 @@ from datetime import datetime
 import os
 from dotenv import load_dotenv
 
-from src.agents.agentic_llm import AgenticLLMAgent, AgentConfig
 from src import AgentResponse
+
+# Import the agent with Criminal IP integration
+try:
+    from src.agents.agentic_llm_with_criminalip import AgenticLLMAgent, AgentConfig
+    CRIMINALIP_AVAILABLE = True
+except ImportError:
+    # Fall back to standard agent if Criminal IP integration is unavailable
+    from src.agents.agentic_llm import AgenticLLMAgent, AgentConfig
+    CRIMINALIP_AVAILABLE = False
 
 # Load environment variables
 load_dotenv()
+
+# Check if Criminal IP API key is configured
+CRIMINALIP_CONFIGURED = bool(os.getenv("CRIMINAL_IP_API_KEY"))
 
 # Page configuration
 st.set_page_config(
@@ -99,6 +110,36 @@ def main():
         enable_search = st.checkbox("Enable Internet Search", value=True)
         max_results = st.slider("Max Search Results", min_value=1, max_value=10, value=5)
         
+        # Security tools section
+        st.header("🔒 Security Tools")
+        
+        # Criminal IP settings
+        criminalip_section = st.expander("Criminal IP", expanded=CRIMINALIP_CONFIGURED)
+        with criminalip_section:
+            if CRIMINALIP_CONFIGURED:
+                st.success("✅ Criminal IP API key configured")
+                criminalip_enabled = st.checkbox("Enable Criminal IP search", value=True)
+                
+                criminalip_mode = st.radio("Query Type", 
+                    ["Combined", "IP Lookup", "Domain Search"], 
+                    index=0,
+                    help="Combined mode will use regular search but include Criminal IP results if relevant")
+                
+                if criminalip_mode == "IP Lookup":
+                    criminalip_ip = st.text_input("IP Address to lookup", placeholder="8.8.8.8")
+                elif criminalip_mode == "Domain Search":
+                    criminalip_domain = st.text_input("Domain to search for", placeholder="example.com")
+            else:
+                st.warning("⚠️ Criminal IP API key not configured")
+                st.markdown("""
+                To use Criminal IP, add your API key to the `.env` file:
+                ```
+                CRIMINAL_IP_API_KEY=your_api_key_here
+                ```
+                Get your API key from [Criminal IP](https://www.criminalip.io/developer/api)
+                """)
+                criminalip_enabled = False
+        
         # FOFA configuration
         st.markdown("---")
         st.markdown("### 🌐 FOFA Integration")
@@ -128,9 +169,17 @@ def main():
         # Search type
         st.markdown("---")
         st.markdown("### 🔍 Search Options")
-        search_type = st.radio("Search Type", ["web", "news", "fofa"], 
+        
+        # Build search type options based on available tools
+        search_options = ["web", "news"]
+        if os.getenv("FOFA_EMAIL") and os.getenv("FOFA_API_KEY"):
+            search_options.append("fofa")
+        if os.getenv("CRIMINAL_IP_API_KEY") and CRIMINALIP_AVAILABLE:
+            search_options.append("criminalip")
+            
+        search_type = st.radio("Search Type", search_options, 
                               index=0,
-                              help="Select 'fofa' to search for internet-connected devices and services")
+                              help="Select specialized search engines for cybersecurity research")
                               
         # Show FOFA specific inputs if selected
         if search_type == "fofa":
@@ -201,6 +250,28 @@ def main():
                 "title=\"admin login\"",
                 "country=US && port=3389"
             ]
+    elif search_type == "criminalip":
+        if 'criminalip_mode' in locals() and criminalip_mode == "IP Lookup":
+            examples = [
+                "8.8.8.8",  # Google DNS
+                "1.1.1.1",  # Cloudflare DNS
+                "104.18.21.226",  # Cloudflare
+                "142.250.190.78"  # Google
+            ]
+        elif 'criminalip_mode' in locals() and criminalip_mode == "Domain Search":
+            examples = [
+                "example.com",
+                "google.com",
+                "microsoft.com",
+                "cloudflare.com"
+            ]
+        else:
+            examples = [
+                "apache 2.4",
+                "nginx servers",
+                "wordpress vulnerabilities",
+                "exposed databases"
+            ]
     else:
         examples = [
             "What are the latest developments in artificial intelligence?",
@@ -244,6 +315,35 @@ def main():
                         # Regular FOFA search
                         st.info(f"Searching FOFA for: {query}")
                         response = agent.process_fofa_query_sync(query)
+                elif search_type == "criminalip":
+                    # Handle Criminal IP searches
+                    if not os.getenv("CRIMINAL_IP_API_KEY"):
+                        st.error("Criminal IP API key not configured. Please add CRIMINAL_IP_API_KEY to your .env file.")
+                        return
+                    
+                    # Determine which Criminal IP search type to use
+                    if criminalip_mode == "IP Lookup":
+                        # Check if the input looks like an IP address
+                        import re
+                        ip_pattern = re.compile(r'^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$')
+                        if ip_pattern.match(query):
+                            st.info(f"Looking up Criminal IP information for IP: {query}")
+                            if hasattr(agent, "process_criminalip_host_sync"):
+                                response = agent.process_criminalip_host_sync(query)
+                            else:
+                                st.error("Criminal IP integration not available")
+                                return
+                        else:
+                            st.warning("Please enter a valid IP address for IP Lookup")
+                            return
+                    else:
+                        # Regular Criminal IP search or domain search
+                        st.info(f"Searching Criminal IP for: {query}")
+                        if hasattr(agent, "process_criminalip_query_sync"):
+                            response = agent.process_criminalip_query_sync(query)
+                        else:
+                            st.error("Criminal IP integration not available")
+                            return
                 else:
                     # Regular web or news search
                     response = agent.process_query_sync(query, search_type)

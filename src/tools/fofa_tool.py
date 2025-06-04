@@ -10,10 +10,10 @@ import base64
 import logging
 from typing import Dict, List, Optional, Any
 import requests
-import dotenv
+from dotenv import load_dotenv
 
 # Load environment variables
-dotenv.load_dotenv()
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 

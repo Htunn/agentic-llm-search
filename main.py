@@ -13,8 +13,14 @@ from rich.markdown import Markdown
 from rich.prompt import Prompt, Confirm
 from dotenv import load_dotenv
 
-from src.agents.agentic_llm import AgenticLLMAgent, AgentConfig
 from src import AgentResponse
+
+# Import the agent with Criminal IP integration
+try:
+    from src.agents.agentic_llm_with_criminalip import AgenticLLMAgent, AgentConfig
+except ImportError:
+    # Fall back to standard agent if Criminal IP integration is unavailable
+    from src.agents.agentic_llm import AgenticLLMAgent, AgentConfig
 
 # Load environment variables
 load_dotenv()
@@ -133,6 +139,9 @@ class AgentCLI:
                     self.agent.clear_memory()
                     console.print("[green]✓ Conversation memory cleared[/green]")
                     continue
+                elif query.lower().startswith('/criminalip'):
+                    self.handle_criminalip_command(query)
+                    continue
                 
                 # Process the query
                 console.print("[dim]🔍 Searching and analyzing...[/dim]")
@@ -158,6 +167,12 @@ class AgentCLI:
         • [cyan]/clear[/cyan] - Clear conversation memory
         • [cyan]/exit[/cyan] - Exit the application
         
+        [bold]Security Tools:[/bold]
+        
+        • [cyan]/criminalip search [query][/cyan] - Search Criminal IP database
+        • [cyan]/criminalip ip [ip_address][/cyan] - Look up an IP address in Criminal IP
+        • [cyan]/criminalip domain [domain][/cyan] - Look up a domain in Criminal IP
+        
         [bold]Usage:[/bold]
         Simply type your question and press Enter. The agent will search the internet
         for relevant information and provide a comprehensive answer with sources.
@@ -171,6 +186,9 @@ class AgentCLI:
     
     def show_config(self):
         """Show current configuration"""
+        # Check if Criminal IP is enabled
+        criminalip_enabled = hasattr(self.agent.search_tool, "criminalip") and self.agent.search_tool.criminalip is not None
+        
         config_text = f"""
         [bold]Current Configuration:[/bold]
         
@@ -182,8 +200,61 @@ class AgentCLI:
         • Search Engine: {self.config.search_engine}
         • Memory Enabled: {getattr(self.agent, 'enable_memory', False)}
         • Debug Mode: {self.config.debug}
+        
+        [bold]Security Tools:[/bold]
+        • Criminal IP: {"✓ Enabled" if criminalip_enabled else "✗ Disabled (Set CRIMINAL_IP_API_KEY in .env)"}
         """
         console.print(Panel(config_text, title="Configuration", border_style="yellow"))
+    
+    def handle_criminalip_command(self, command: str):
+        """Handle Criminal IP specific commands"""
+        parts = command.split()
+        
+        # Basic validation
+        if len(parts) < 3:
+            console.print("[yellow]Usage:[/yellow]")
+            console.print("  /criminalip search <query> - Search Criminal IP database")
+            console.print("  /criminalip ip <ip_address> - Look up an IP address")
+            console.print("  /criminalip domain <domain> - Look up a domain")
+            return
+        
+        # Check if Criminal IP integration is available
+        if not hasattr(self.agent, "process_criminalip_query_sync"):
+            console.print("[bold red]Error: Criminal IP integration is not available[/bold red]")
+            console.print("[yellow]Make sure the CriminalIP tool is properly installed and CRIMINAL_IP_API_KEY is set in your .env file[/yellow]")
+            return
+            
+        action = parts[1].lower()
+        
+        try:
+            if action == "search":
+                # Handle search
+                query = " ".join(parts[2:])
+                console.print(f"[dim]🔍 Searching Criminal IP for: {query}...[/dim]")
+                response = self.agent.process_criminalip_query_sync(query)
+                self.display_response(response)
+                
+            elif action == "ip":
+                # Handle IP lookup
+                ip_address = parts[2]
+                console.print(f"[dim]🔍 Looking up IP address in Criminal IP: {ip_address}...[/dim]")
+                response = self.agent.process_criminalip_host_sync(ip_address)
+                self.display_response(response)
+                
+            elif action == "domain":
+                # Handle domain lookup
+                domain = parts[2]
+                console.print(f"[dim]🔍 Looking up domain in Criminal IP: {domain}...[/dim]")
+                # Use the search function for domains since there's no dedicated domain lookup in the agent
+                response = self.agent.process_criminalip_query_sync(domain)
+                self.display_response(response)
+                
+            else:
+                console.print(f"[yellow]Unknown Criminal IP command: {action}[/yellow]")
+                console.print("Available commands: search, ip, domain")
+        
+        except Exception as e:
+            console.print(f"[bold red]Error executing Criminal IP command: {str(e)}[/bold red]")
     
     def single_query_mode(self, query: str):
         """Process a single query and exit"""

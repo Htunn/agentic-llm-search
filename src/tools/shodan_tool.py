@@ -9,10 +9,10 @@ import json
 from typing import Dict, List, Optional, Any
 from shodan import Shodan
 from shodan.exception import APIError
-import dotenv
+from dotenv import load_dotenv
 
 # Load environment variables
-dotenv.load_dotenv()
+load_dotenv()
 
 class ShodanSearchTool:
     """

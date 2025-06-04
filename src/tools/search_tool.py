@@ -12,7 +12,8 @@ from bs4 import BeautifulSoup
 from duckduckgo_search import DDGS
 import time
 import os
-import dotenv
+import re
+from dotenv import load_dotenv
 
 # Import the ShodanSearchTool
 try:
@@ -28,10 +29,17 @@ try:
 except ImportError:
     FOFA_AVAILABLE = False
 
+# Import the CriminalIPTool
+try:
+    from src.tools.criminalip_tool import CriminalIPTool
+    CRIMINALIP_AVAILABLE = True
+except ImportError:
+    CRIMINALIP_AVAILABLE = False
+
 from src import SearchResult
 
 # Load environment variables
-dotenv.load_dotenv()
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +73,36 @@ class InternetSearchTool:
                     logger.info("FOFA search tool initialized successfully")
             except Exception as e:
                 logger.warning(f"Failed to initialize FOFA search: {str(e)}")
+                
+        # Initialize Criminal IP search if available
+        self.criminalip = None
+        if CRIMINALIP_AVAILABLE:
+            try:
+                # Try to get the API key from environment variables first
+                criminalip_api_key = os.getenv("CRIMINAL_IP_API_KEY")
+                
+                # If not found, try to reload .env file (in case it was updated)
+                if not criminalip_api_key:
+                    load_dotenv(override=True)
+                    criminalip_api_key = os.getenv("CRIMINAL_IP_API_KEY")
+                
+                if criminalip_api_key:
+                    self.criminalip = CriminalIPTool(criminalip_api_key)
+                    
+                    # Test the API key by making a simple request
+                    user_info = self.criminalip.get_user_info()
+                    if "error" in user_info:
+                        error_msg = user_info.get("error", "Unknown error")
+                        solution = user_info.get("solution", "Check your API key configuration")
+                        logger.warning(f"Criminal IP API key validation failed: {error_msg}. {solution}")
+                        self.criminalip = None
+                    else:
+                        logger.info("Criminal IP search tool initialized successfully")
+                else:
+                    logger.warning("Criminal IP API key not found. Set CRIMINAL_IP_API_KEY in your .env file")
+            except Exception as e:
+                logger.warning(f"Failed to initialize Criminal IP search: {str(e)}")
+                logger.info("To use Criminal IP search, set CRIMINAL_IP_API_KEY in your .env file")
     
     def search(self, query: str, search_type: str = "web") -> List[SearchResult]:
         """
@@ -459,6 +497,190 @@ class InternetSearchTool:
         """Async version of fofa_host_lookup method"""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self.fofa_host_lookup, ip)
+    
+    def criminalip_search(self, query: str, limit: int = 5) -> List[SearchResult]:
+        """
+        Search for security information using Criminal IP
+        
+        Args:
+            query: Search query
+            limit: Maximum number of results (default: 5)
+            
+        Returns:
+            List of SearchResult objects
+        """
+        if not self.criminalip:
+            logger.warning("Criminal IP search not available. Make sure CRIMINAL_IP_API_KEY is set in .env")
+            return []
+        
+        try:
+            logger.info(f"Searching Criminal IP for: {query}")
+            search_results = []
+            
+            # Check if the query is an IP address
+            ip_pattern = r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$"
+            is_ip = bool(re.match(ip_pattern, query))
+            
+            if is_ip:
+                # If it's an IP, do an IP report search
+                result = self.criminalip_ip_lookup(query)
+                if result:
+                    search_results.append(result)
+            else:
+                # Check if it's a domain
+                domain_pattern = r"^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{2,}$"
+                is_domain = bool(re.match(domain_pattern, query.lower()))
+                
+                if is_domain:
+                    # If it's a domain, do a domain search
+                    domain_results = self.criminalip.search_domain(query, limit=limit)
+                    formatted_results = self.criminalip.format_domain_results(domain_results)
+                    
+                    search_result = SearchResult(
+                        title=f"Criminal IP Domain Analysis: {query}",
+                        url=f"https://www.criminalip.io/domain/report?query={query}",
+                        content=formatted_results,
+                        source='Criminal IP',
+                        timestamp=datetime.now(),
+                        relevance_score=1.0
+                    )
+                    search_results.append(search_result)
+                else:
+                    # General asset search
+                    asset_results = self.criminalip.asset_search(query, limit=limit)
+                    
+                    # Process the asset search results
+                    if "data" in asset_results and "result" in asset_results["data"]:
+                        items = asset_results["data"]["result"]
+                        for item in items[:limit]:
+                            # Determine the type from available fields
+                            if "ip_address" in item:
+                                result_type = "ip"
+                                ip = item.get("ip_address", "")
+                                domain = ""
+                                title = ip
+                            elif "domain" in item:
+                                result_type = "domain"
+                                domain = item.get("domain", "")
+                                ip = ""
+                                title = domain
+                            else:
+                                result_type = "service"
+                                ip = ""
+                                domain = ""
+                                title = item.get("title", "") or item.get("hostname", "Unknown")
+                            
+                            # Create a URL based on the result type
+                            if result_type == "ip":
+                                url = f"https://www.criminalip.io/asset/report?ip={ip}"
+                            elif result_type == "domain":
+                                url = f"https://www.criminalip.io/domain/report?query={domain}"
+                            else:
+                                # For other types, use the search URL with the original query
+                                url = f"https://www.criminalip.io/search?query={query}"
+                            
+                            # Build content from the item details
+                            content = f"Type: {result_type}\n"
+                            if ip:
+                                content += f"IP: {ip}\n"
+                            if domain:
+                                content += f"Domain: {domain}\n"
+                            if "hostname" in item and item["hostname"]:
+                                content += f"Hostname: {item['hostname']}\n"
+                            if "country" in item:
+                                content += f"Country: {item['country']}\n"
+                            if "city" in item and item["city"]:
+                                content += f"City: {item['city']}\n"
+                            if "as_name" in item and item["as_name"]:
+                                content += f"ASN: {item['as_name']}\n"
+                            if "server" in item and item["server"]:
+                                content += f"Server: {item['server']}\n"
+                            if "has_cve" in item:
+                                has_cve = "Yes" if item["has_cve"] else "No"
+                                content += f"Has CVEs: {has_cve}\n"
+                                
+                            search_result = SearchResult(
+                                title=f"Criminal IP: {title}",
+                                url=url,
+                                content=content,
+                                source='Criminal IP',
+                                timestamp=datetime.now(),
+                                relevance_score=0.9
+                            )
+                            search_results.append(search_result)
+            
+            logger.info(f"Found {len(search_results)} Criminal IP results")
+            return search_results
+            
+        except Exception as e:
+            logger.error(f"Criminal IP search failed: {str(e)}")
+            return []
+    
+    def criminalip_ip_lookup(self, ip: str) -> Optional[SearchResult]:
+        """
+        Look up detailed information about an IP address in Criminal IP
+        
+        Args:
+            ip: IP address to look up
+            
+        Returns:
+            SearchResult with detailed IP information or None
+        """
+        if not self.criminalip:
+            logger.warning("Criminal IP search not available. Make sure CRIMINAL_IP_API_KEY is set in .env")
+            return None
+        
+        try:
+            logger.info(f"Looking up Criminal IP information for IP: {ip}")
+            
+            # Get detailed IP report
+            ip_report = self.criminalip.search_ip(ip)
+            
+            # Format the IP results
+            content = self.criminalip.format_ip_results(ip_report)
+            
+            # Get additional security information
+            try:
+                malicious_info = self.criminalip.check_ip_malicious(ip)
+                if "data" in malicious_info and malicious_info["data"]:
+                    mal_data = malicious_info["data"]
+                    content += "\nMalicious Activity Report:\n"
+                    if "is_malicious" in mal_data:
+                        mal_status = "Yes" if mal_data["is_malicious"] else "No"
+                        content += f"Is Malicious: {mal_status}\n"
+                    if "is_proxy" in mal_data:
+                        proxy_status = "Yes" if mal_data["is_proxy"] else "No"
+                        content += f"Is Proxy: {proxy_status}\n"
+                    if "status" in mal_data:
+                        content += f"Status: {mal_data['status']}\n"
+            except Exception as mal_err:
+                logger.warning(f"Could not retrieve malicious info: {str(mal_err)}")
+            
+            # Create search result
+            search_result = SearchResult(
+                title=f"Criminal IP Analysis: {ip}",
+                url=f"https://www.criminalip.io/asset/report?ip={ip}",
+                content=content,
+                source='Criminal IP',
+                timestamp=datetime.now(),
+                relevance_score=1.0
+            )
+            
+            return search_result
+            
+        except Exception as e:
+            logger.error(f"Criminal IP lookup failed: {str(e)}")
+            return None
+    
+    async def async_criminalip_search(self, query: str, limit: int = 5) -> List[SearchResult]:
+        """Async version of criminalip_search method"""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self.criminalip_search, query, limit)
+        
+    async def async_criminalip_ip_lookup(self, ip: str) -> Optional[SearchResult]:
+        """Async version of criminalip_ip_lookup method"""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self.criminalip_ip_lookup, ip)
 
 class SearchQueryOptimizer:
     """Optimizes search queries for better results"""
