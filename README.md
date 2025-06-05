@@ -359,37 +359,64 @@ The following sequence diagram illustrates how Criminal IP is integrated with th
 sequenceDiagram
     participant User
     participant CLI as Criminal IP CLI
-    participant Agent as AgenticLLMWithCriminalIP
-    participant Tool as CriminalIPTool
-    participant API as Criminal IP API
+    participant WebCLI as Web Search CLI
+    participant Agent as AgenticLLMAgent
+    participant CIPTool as CriminalIPTool
+    participant WebTool as InternetSearchTool
+    participant CIPAPI as Criminal IP API
+    participant DDG as DuckDuckGo
     participant LLM as Language Model
     participant Response as AgentResponse
 
     User->>CLI: Command (ip/search/domain/banner)
     activate CLI
     
-    alt Direct CLI Usage
-        CLI->>Tool: API Request
-        activate Tool
-        Tool->>API: HTTP Request
-        activate API
-        API-->>Tool: JSON Response
-        deactivate API
-        Tool-->>CLI: Formatted Results
-        deactivate Tool
+    alt Direct CriminalIP CLI Usage
+        CLI->>CIPTool: API Request
+        activate CIPTool
+        CIPTool->>CIPAPI: HTTP Request
+        activate CIPAPI
+        CIPAPI-->>CIPTool: JSON Response
+        deactivate CIPAPI
+        CIPTool-->>CLI: Formatted Results
+        deactivate CIPTool
         CLI-->>User: Display Results
-    else Programmatic Usage
-        User->>Agent: process_criminalip_ip/search()
+    else Direct Web Search Usage
+        User->>WebCLI: Web search query
+        activate WebCLI
+        WebCLI->>WebTool: Search request
+        activate WebTool
+        WebTool->>DDG: Web search
+        activate DDG
+        DDG-->>WebTool: Search results
+        deactivate DDG
+        WebTool-->>WebCLI: Formatted results
+        deactivate WebTool
+        WebCLI-->>User: Display results
+    else Integrated Agent Usage
+        User->>Agent: process_query(query)
         activate Agent
         
-        Agent->>Tool: async_criminalip_ip_lookup/search()
-        activate Tool
-        Tool->>API: HTTP Request
-        activate API
-        API-->>Tool: JSON Response
-        deactivate API
-        Tool-->>Agent: SearchResult Objects
-        deactivate Tool
+        alt Security Query
+            Agent->>CIPTool: async_criminalip_ip_lookup/search()
+            activate CIPTool
+            CIPTool->>CIPAPI: HTTP Request
+            activate CIPAPI
+            CIPAPI-->>CIPTool: JSON Response
+            deactivate CIPAPI
+            CIPTool-->>Agent: SecurityResult Objects
+            deactivate CIPTool
+        else Web Search Query
+            Agent->>WebTool: async_search(query)
+            activate WebTool
+            WebTool->>DDG: Web Search Request
+            activate DDG
+            DDG-->>WebTool: Search Results & Pages
+            deactivate DDG
+            WebTool->>WebTool: Extract Content
+            WebTool-->>Agent: SearchResult Objects
+            deactivate WebTool
+        end
         
         Agent->>LLM: Generate Response with Context
         activate LLM
@@ -404,19 +431,25 @@ sequenceDiagram
     deactivate CLI
 ```
 
-### Criminal IP Component Integration
+### Integrated Search Component Architecture
 
 ```mermaid
 graph TD
-    User([User]) --> |Security Query| CLI(Criminal IP CLI)
-    User --> |API Request| AgentAPI(AgenticLLMWithCriminalIP)
+    User([User]) --> |Security Query| CIPCLI(Criminal IP CLI)
+    User --> |Web Query| MainCLI(Main CLI)
+    User --> |Web/API Request| AgentAPI(Web Interface / API)
     
-    CLI --> Tool(CriminalIPTool)
-    AgentAPI --> Agent(AgenticLLMAgent)
-    Agent --> Tool
+    CIPCLI --> CIPTool(CriminalIPTool)
+    MainCLI --> Agent(AgenticLLMAgent)
+    AgentAPI --> Agent
+    
+    Agent --> CIPTool
+    Agent --> WebTool(InternetSearchTool)
     Agent --> Orchestrator(AgentModelOrchestrator)
     
-    Tool --> |HTTP Request| CIPAPI[(Criminal IP API)]
+    CIPTool --> |HTTP Request| CIPAPI[(Criminal IP API)]
+    WebTool --> |HTTP Request| DDG[(DuckDuckGo)]
+    WebTool --> |Content Extraction| WebContent[(Web Content)]
     
     Orchestrator --> |Format Results| ResultProcessor(Result Processor)
     Orchestrator --> |Generate Answer| LLM{LLM Model}
@@ -424,39 +457,48 @@ graph TD
     ResultProcessor --> |Context| LLM
     LLM --> |Answer| Response(AgentResponse)
     
-    Tool --> |Sources| Response
+    CIPTool --> |Security Sources| Response
+    WebTool --> |Web Sources| Response
     
-    style Tool fill:#f9f,stroke:#333,stroke-width:2px
+    style CIPTool fill:#f9f,stroke:#333,stroke-width:2px
+    style WebTool fill:#9ff,stroke:#333,stroke-width:2px
     style Agent fill:#bbf,stroke:#333,stroke-width:2px
     style CIPAPI fill:#fbf,stroke:#333,stroke-width:2px
+    style DDG fill:#9ff,stroke:#333,stroke-width:2px
+    style LLM fill:#bfb,stroke:#333,stroke-width:2px
 ```
 
-### Criminal IP Deployment Architecture
+### Integrated System Deployment Architecture
 
-The following deployment diagram illustrates how the Criminal IP components are deployed:
+The following deployment diagram illustrates how both web search and Criminal IP components are deployed together:
 
 ```mermaid
 flowchart TD
     subgraph User["User Environment"]
         CLI["Criminal IP CLI<br>(criminalip_cli.py)"]
-        App["Main Application<br>(app.py/main.py)"]
+        MainCLI["Main CLI<br>(main.py)"]
+        WebUI["Web Interface<br>(app.py)"]
         API["API Server<br>(api.py)"]
     end
     
     subgraph ProjectCore["Core Project Components"]
-        Agent["AgenticLLMWithCriminalIP<br>(agentic_llm_with_criminalip.py)"]
+        Agent["AgenticLLM<br>(agentic_llm.py)"]
+        CriminalIPAgent["AgenticLLMWithCriminalIP<br>(agentic_llm_with_criminalip.py)"]
         SearchTools["InternetSearchTool<br>(search_tool.py)"]
         LLMModels["LLM Models<br>(llm_models.py)"]
     end
     
-    subgraph CIPIntegration["Criminal IP Integration"]
+    subgraph SearchIntegrations["Search Integrations"]
         CIPTool["CriminalIPTool<br>(criminalip_tool.py)"]
         CIPMethods["Criminal IP Methods<br>(add_criminalip.py)"]
+        WebSearch["DuckDuckGo Search<br>(search_tool.py)"]
+        ContentExtractor["Content Extractor<br>(search_tool.py)"]
     end
     
     subgraph ExternalServices["External Services"]
         CIPAPI["Criminal IP API<br>(api.criminalip.io)"]
-        WebSearch["Web Search<br>(DuckDuckGo)"]
+        DDG["DuckDuckGo<br>(duckduckgo.com)"]
+        WebPages["Web Pages<br>(Content Sources)"]
     end
     
     subgraph ModelBackends["Model Backends"]
@@ -465,16 +507,21 @@ flowchart TD
     end
     
     CLI --> CIPTool
-    App --> Agent
+    MainCLI --> Agent
+    WebUI --> Agent
     API --> Agent
     
-    Agent --> CIPMethods
+    Agent --> CriminalIPAgent
+    CriminalIPAgent --> CIPMethods
     CIPMethods --> CIPTool
     Agent --> SearchTools
+    SearchTools --> WebSearch
+    SearchTools --> ContentExtractor
     Agent --> LLMModels
     
     CIPTool --> CIPAPI
-    SearchTools --> WebSearch
+    WebSearch --> DDG
+    ContentExtractor --> WebPages
     
     LLMModels --> LocalModel
     LLMModels --> CloudAPI
@@ -482,6 +529,10 @@ flowchart TD
     style CIPTool fill:#f9f,stroke:#333,stroke-width:2px
     style CIPMethods fill:#f9f,stroke:#333,stroke-width:2px
     style CIPAPI fill:#fbf,stroke:#333,stroke-width:2px
+    style WebSearch fill:#9ff,stroke:#333,stroke-width:2px
+    style ContentExtractor fill:#9ff,stroke:#333,stroke-width:2px
+    style DDG fill:#9ff,stroke:#333,stroke-width:2px
+    style WebPages fill:#9ff,stroke:#333,stroke-width:2px
 ```
 
-The Criminal IP integration uses a modular design that allows it to function either as a standalone CLI tool or as an integrated component within the larger agentic-llm-search ecosystem. This architecture makes it easy to maintain and extend the Criminal IP functionality without affecting other parts of the system.
+This integrated architecture shows how the system combines both web search capabilities (via DuckDuckGo) and security search capabilities (via Criminal IP) into a unified framework. The modular design allows each component to function either independently (via dedicated CLIs) or as integrated parts of the complete system. This approach makes the system highly extensible, allowing for easy maintenance and addition of new search capabilities without affecting other parts of the system.
