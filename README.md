@@ -350,4 +350,138 @@ user_info = criminalip.get_user_info()
 - **Network Security Monitoring**: Track changes in your exposed services and identify new risks
 
 For detailed information, see the [Criminal IP Integration](CRIMINALIP_INTEGRATION.md) documentation and [API Format](CRIMINALIP_API_FORMAT.md) reference.
-````
+
+### Criminal IP Integration Sequence Diagram
+
+The following sequence diagram illustrates how Criminal IP is integrated with the agentic-llm-search project:
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant CLI as Criminal IP CLI
+    participant Agent as AgenticLLMWithCriminalIP
+    participant Tool as CriminalIPTool
+    participant API as Criminal IP API
+    participant LLM as Language Model
+    participant Response as AgentResponse
+
+    User->>CLI: Command (ip/search/domain/banner)
+    activate CLI
+    
+    alt Direct CLI Usage
+        CLI->>Tool: API Request
+        activate Tool
+        Tool->>API: HTTP Request
+        activate API
+        API-->>Tool: JSON Response
+        deactivate API
+        Tool-->>CLI: Formatted Results
+        deactivate Tool
+        CLI-->>User: Display Results
+    else Programmatic Usage
+        User->>Agent: process_criminalip_ip/search()
+        activate Agent
+        
+        Agent->>Tool: async_criminalip_ip_lookup/search()
+        activate Tool
+        Tool->>API: HTTP Request
+        activate API
+        API-->>Tool: JSON Response
+        deactivate API
+        Tool-->>Agent: SearchResult Objects
+        deactivate Tool
+        
+        Agent->>LLM: Generate Response with Context
+        activate LLM
+        LLM-->>Agent: Generated Answer
+        deactivate LLM
+        
+        Agent->>Response: Create AgentResponse
+        Agent-->>User: Return AgentResponse
+        deactivate Agent
+    end
+    
+    deactivate CLI
+```
+
+### Criminal IP Component Integration
+
+```mermaid
+graph TD
+    User([User]) --> |Security Query| CLI(Criminal IP CLI)
+    User --> |API Request| AgentAPI(AgenticLLMWithCriminalIP)
+    
+    CLI --> Tool(CriminalIPTool)
+    AgentAPI --> Agent(AgenticLLMAgent)
+    Agent --> Tool
+    Agent --> Orchestrator(AgentModelOrchestrator)
+    
+    Tool --> |HTTP Request| CIPAPI[(Criminal IP API)]
+    
+    Orchestrator --> |Format Results| ResultProcessor(Result Processor)
+    Orchestrator --> |Generate Answer| LLM{LLM Model}
+    
+    ResultProcessor --> |Context| LLM
+    LLM --> |Answer| Response(AgentResponse)
+    
+    Tool --> |Sources| Response
+    
+    style Tool fill:#f9f,stroke:#333,stroke-width:2px
+    style Agent fill:#bbf,stroke:#333,stroke-width:2px
+    style CIPAPI fill:#fbf,stroke:#333,stroke-width:2px
+```
+
+### Criminal IP Deployment Architecture
+
+The following deployment diagram illustrates how the Criminal IP components are deployed:
+
+```mermaid
+flowchart TD
+    subgraph User["User Environment"]
+        CLI["Criminal IP CLI<br>(criminalip_cli.py)"]
+        App["Main Application<br>(app.py/main.py)"]
+        API["API Server<br>(api.py)"]
+    end
+    
+    subgraph ProjectCore["Core Project Components"]
+        Agent["AgenticLLMWithCriminalIP<br>(agentic_llm_with_criminalip.py)"]
+        SearchTools["InternetSearchTool<br>(search_tool.py)"]
+        LLMModels["LLM Models<br>(llm_models.py)"]
+    end
+    
+    subgraph CIPIntegration["Criminal IP Integration"]
+        CIPTool["CriminalIPTool<br>(criminalip_tool.py)"]
+        CIPMethods["Criminal IP Methods<br>(add_criminalip.py)"]
+    end
+    
+    subgraph ExternalServices["External Services"]
+        CIPAPI["Criminal IP API<br>(api.criminalip.io)"]
+        WebSearch["Web Search<br>(DuckDuckGo)"]
+    end
+    
+    subgraph ModelBackends["Model Backends"]
+        LocalModel["Local LLM<br>(TinyLlama)"]
+        CloudAPI["OpenAI/Azure<br>API"]
+    end
+    
+    CLI --> CIPTool
+    App --> Agent
+    API --> Agent
+    
+    Agent --> CIPMethods
+    CIPMethods --> CIPTool
+    Agent --> SearchTools
+    Agent --> LLMModels
+    
+    CIPTool --> CIPAPI
+    SearchTools --> WebSearch
+    
+    LLMModels --> LocalModel
+    LLMModels --> CloudAPI
+    
+    style CIPTool fill:#f9f,stroke:#333,stroke-width:2px
+    style CIPMethods fill:#f9f,stroke:#333,stroke-width:2px
+    style CIPAPI fill:#fbf,stroke:#333,stroke-width:2px
+```
+
+The Criminal IP integration uses a modular design that allows it to function either as a standalone CLI tool or as an integrated component within the larger agentic-llm-search ecosystem. This architecture makes it easy to maintain and extend the Criminal IP functionality without affecting other parts of the system.
