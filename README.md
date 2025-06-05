@@ -39,7 +39,10 @@ python3 main.py
 ## Features
 
 - **Internet Search**: Fetch and process information from the web using DuckDuckGo search
-- **Shodan and FOFA Integration**: Search for internet-connected devices and services using Shodan and FOFA
+- **Threat Intelligence**: Integrate with cybersecurity search engines for security research
+  - **Criminal IP**: Analyze IP reputation, security scores, and identify malicious activities
+  - **Shodan Integration**: Search for internet-connected devices and services using Shodan
+  - **FOFA Integration**: Search for internet-connected devices and services using FOFA
 - **Local LLM Inference**: Use TinyLlama for efficient inference on your local machine
 - **GPU Acceleration**: Support for Apple Silicon M-series GPU acceleration using Metal
 - **OpenAI Integration**: Optionally use OpenAI models for more powerful responses
@@ -51,8 +54,10 @@ python3 main.py
 ## Documentation
 
 - [Main README](README.md): Overview and general usage
+- [Criminal IP Integration](CRIMINALIP_INTEGRATION.md): Using the Criminal IP cybersecurity search capabilities
 - [Shodan Integration](SHODAN_INTEGRATION.md): Using the Shodan search capabilities
 - [FOFA Integration](FOFA_INTEGRATION.md): Using the Fofa search capabilities
+- [Search Tools Comparison](SEARCH_TOOLS_COMPARISON.md): Comparison between different search tools
 - [Multi-Model Support](MULTI_MODEL_SUPPORT.md): Working with different LLM models
 - [Implementation Details](IMPLEMENTATION_SUMMARY.md): Technical details on the implementation
 - [Improvements](IMPROVEMENTS.md): Planned future improvements
@@ -231,328 +236,118 @@ Available Azure OpenAI models (deployment names may vary):
 - `gpt-4` (Azure's GPT-4)
 - `gpt-4-turbo` (Azure's GPT-4 Turbo)
 
-## Usage
+## Using Criminal IP Search
 
-### Using run.sh Script (Recommended)
+The Criminal IP integration provides advanced cybersecurity search capabilities alongside Shodan and FOFA. This feature offers IP reputation, threat intelligence, and security scoring for enhanced cyber threat intelligence.
 
-The easiest way to use the application is with the included `run.sh` script, which handles environment setup, model checking, and provides a simple interface:
+### Setting up Criminal IP
+
+1. Create a Criminal IP account at [Criminal IP](https://www.criminalip.io/developer)
+2. Generate an API key in your account dashboard
+3. Configure your API key using one of these methods:
+
+   **Option 1: Using the CLI setup command (Recommended)**
+   ```bash
+   # Set up with interactive prompt (secure)
+   ./criminalip_cli.py setup
+
+   # Or provide the key directly
+   ./criminalip_cli.py setup --api-key YOUR_API_KEY
+   ```
+
+   **Option 2: Manual setup**
+   Add to your `.env` file:
+   ```
+   CRIMINAL_IP_API_KEY=your_criminalip_api_key_here
+   ```
+
+### Criminal IP CLI
+
+Use the dedicated CriminalIP CLI for powerful cybersecurity searches:
 
 ```bash
-# Make the script executable if needed
-chmod +x run.sh
+# Get information about an IP address
+./criminalip_cli.py ip 8.8.8.8
 
-# Run the application
+# Search for assets matching a query
+./criminalip_cli.py search "apache 2.4"
+
+# Get information about a domain
+./criminalip_cli.py domain example.com
+
+# Search for banner information
+./criminalip_cli.py banner "nginx"
+
+# View API account information and usage
+./criminalip_cli.py info
+
+# Get help with available commands
+./criminalip_cli.py help
+
+# Validate your API key
+./criminalip_cli.py setup --validate
+```
+
+You can also access the Criminal IP CLI through the main run.sh script:
+```bash
 ./run.sh
+# Select option 3 for "Criminal IP CLI"
 ```
 
-The script will:
-1. Check for Python 3.12+ and set up a virtual environment
-2. Verify the model is downloaded or download it if missing
-3. Let you choose a model provider (Local TinyLlama or Azure OpenAI)
-4. Let you select between CLI and Web Interface
+### Programmatic Usage
 
-### Command Line Interface
+You can integrate Criminal IP capabilities into your Python applications:
 
-Run the agent in interactive mode:
-```bash
-python3 main.py
+```python
+from src.agents.agentic_llm_with_criminalip import AgenticLLM
+
+# Initialize the agent with Criminal IP capabilities
+agent = AgenticLLM()
+
+# Synchronous usage
+response = agent.process_criminalip_search("apache 2.4")
+response = agent.process_criminalip_ip("8.8.8.8")
+
+# Asynchronous usage
+response = await agent.process_criminalip_query("apache 2.4")
+response = await agent.process_criminalip_host("8.8.8.8")
+
+# Access formatted answer
+print(response.answer)
+
+# Access sources
+for source in response.sources:
+    print(f"- {source.title}: {source.url}")
 ```
 
-Or ask a single question:
-```bash
-python3 main.py "What are the latest developments in AI?"
+### Direct API Access
+
+For advanced use cases, you can access the Criminal IP API directly:
+
+```python
+from src.tools.criminalip_tool import CriminalIPTool
+import os
+
+# Initialize the tool with your API key
+api_key = os.getenv("CRIMINAL_IP_API_KEY")
+criminalip = CriminalIPTool(api_key)
+
+# Available methods
+ip_report = criminalip.search_ip("8.8.8.8")
+ip_malicious = criminalip.check_ip_malicious("8.8.8.8")
+domain_info = criminalip.search_domain("example.com")
+assets = criminalip.asset_search("apache 2.4")
+banners = criminalip.banner_search("nginx")
+user_info = criminalip.get_user_info()
 ```
 
-Additional CLI options:
-```
---model MODEL         LLM model to use (default: ./src/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf)
---provider PROVIDER   Model provider to use (choices: huggingface, openai, azure-openai)
---no-search           Disable internet search
---max-results MAX     Maximum search results to use (default: 5)
-```
+### Example Use Cases
 
-### Web Interface
+- **Security Research**: Investigate IP addresses for malicious activity and security vulnerabilities
+- **Threat Intelligence**: Research domains and identify potential security issues and threats
+- **Asset Discovery**: Find internet-exposed services and assess organization risk posture
+- **Vulnerability Assessment**: Identify potentially vulnerable systems through version and banner analysis
+- **Network Security Monitoring**: Track changes in your exposed services and identify new risks
 
-Run the Streamlit web app:
-```bash
-streamlit run app.py
-```
-
-Then open your browser at http://localhost:8501.
-
-### API Server
-
-Start the FastAPI server:
-```bash
-python3 -m uvicorn api:app --reload
-```
-
-Then access the API at http://localhost:8000 or view the API documentation at http://localhost:8000/docs.
-
-## Development
-
-### Project Structure
-
-```
-├── app.py              # Streamlit web interface
-├── api.py              # FastAPI web API
-├── main.py             # Command-line interface
-├── requirements.txt    # Dependencies
-├── src/
-│   ├── __init__.py     # Core data models
-│   ├── agents/         # Agent implementation
-│   ├── models/         # LLM model wrappers
-│   ├── tools/          # Search and utility tools
-│   └── utils/          # Utility functions
-└── tests/              # Test cases
-```
-
-### Running Tests
-
-```bash
-pytest tests/
-```
-
-## System Architecture
-
-### Sequence Diagram
-
-The following sequence diagram illustrates how the different components of the Agentic LLM Search system interact during a typical query:
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant AgenticLLMAgent
-    participant SearchQueryOptimizer
-    participant InternetSearchTool
-    participant LLMModel
-    participant AgentModelOrchestrator
-
-    User->>AgenticLLMAgent: process_query(query)
-    activate AgenticLLMAgent
-    
-    AgenticLLMAgent->>SearchQueryOptimizer: optimize_query(query)
-    activate SearchQueryOptimizer
-    SearchQueryOptimizer-->>AgenticLLMAgent: optimized_query
-    deactivate SearchQueryOptimizer
-    
-    AgenticLLMAgent->>InternetSearchTool: async_search(optimized_query)
-    activate InternetSearchTool
-    
-    InternetSearchTool->>InternetSearchTool: Search web with DuckDuckGo
-    InternetSearchTool->>InternetSearchTool: Extract content from webpages
-    InternetSearchTool-->>AgenticLLMAgent: search_results
-    deactivate InternetSearchTool
-    
-    AgenticLLMAgent->>AgentModelOrchestrator: generate_research_response(query, search_results)
-    activate AgentModelOrchestrator
-    
-    AgentModelOrchestrator->>AgentModelOrchestrator: Format search results for context
-    AgentModelOrchestrator->>LLMModel: generate_response(query, context)
-    activate LLMModel
-    
-    alt HuggingFaceModel
-        LLMModel->>LLMModel: Process with TinyLlama (GPU accelerated)
-    else OpenAIModel
-        LLMModel->>LLMModel: Call OpenAI API
-    end
-    
-    LLMModel-->>AgentModelOrchestrator: answer
-    deactivate LLMModel
-    
-    AgentModelOrchestrator-->>AgenticLLMAgent: AgentResponse(answer, sources, etc.)
-    deactivate AgentModelOrchestrator
-    
-    AgenticLLMAgent-->>User: AgentResponse
-    deactivate AgenticLLMAgent
-```
-
-### Component Diagram
-
-```mermaid
-graph TD
-    User([User]) --> |Query| CLI(Command Line Interface)
-    User --> |Query| WebUI(Web UI - Streamlit)
-    User --> |API Call| API(API Server - FastAPI)
-    
-    CLI --> Agent(AgenticLLMAgent)
-    WebUI --> Agent
-    API --> Agent
-    
-    Agent --> |Optimize| QueryOpt(SearchQueryOptimizer)
-    Agent --> |Search| SearchTool(InternetSearchTool)
-    Agent --> |Generate Response| Orchestrator(AgentModelOrchestrator)
-    
-    SearchTool --> |Web Search| DuckDuckGo[(DuckDuckGo)]
-    SearchTool --> |Content Extraction| WebPages[(Web Pages)]
-    
-    Orchestrator --> LLM{LLM Model}
-    
-    LLM --> |Local| HFModel(HuggingFaceModel)
-    LLM --> |Cloud| OpenAIModel(OpenAIModel)
-    
-    HFModel --> TinyLlama[(TinyLlama GGUF)]
-    OpenAIModel --> |API| OpenAI[(OpenAI API)]
-    
-    style Agent fill:#f9f,stroke:#333,stroke-width:2px
-    style LLM fill:#bbf,stroke:#333,stroke-width:2px
-    style SearchTool fill:#bfb,stroke:#333,stroke-width:2px
-```
-
-## Deployment Sequence Diagram
-
-This diagram shows how the system handles model initialization and setup, especially with GPU acceleration:
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant Runner as RunnerScript
-    participant EnvSetup as EnvironmentSetup
-    participant HFModel as HuggingFaceModel
-    participant GPU as GPU Detection
-    participant ModelLoader as ModelLoader
-    
-    User->>Runner: Start application
-    activate Runner
-    
-    Runner->>EnvSetup: setup_huggingface_env()
-    activate EnvSetup
-    
-    EnvSetup->>EnvSetup: Check for hf_transfer
-    EnvSetup->>GPU: detect_apple_silicon()
-    activate GPU
-    
-    alt Apple Silicon Detected
-        GPU-->>EnvSetup: M-series chip detected
-        EnvSetup->>EnvSetup: setup_gpu_environment()
-        EnvSetup->>EnvSetup: Configure Metal backend
-    else Other Hardware
-        GPU-->>EnvSetup: Standard hardware detected
-        EnvSetup->>EnvSetup: Use default configuration
-    end
-    deactivate GPU
-    
-    EnvSetup-->>Runner: Environment configured
-    deactivate EnvSetup
-    
-    Runner->>HFModel: Initialize model
-    activate HFModel
-    
-    HFModel->>HFModel: Set acceleration options
-    
-    alt Metal GPU Available
-        HFModel->>ModelLoader: Load with MPS backend
-        HFModel->>HFModel: Configure 32 GPU layers
-        HFModel->>HFModel: Set 4096 context length
-    else CPU Only
-        HFModel->>ModelLoader: Load with CPU backend
-        HFModel->>HFModel: Use default settings
-    end
-    
-    HFModel-->>Runner: Model ready for inference
-    deactivate HFModel
-    
-    Runner-->>User: System ready for queries
-    deactivate Runner
-```
-
-## License
-
-MIT
-
-## Troubleshooting
-
-### Diagnostic Tools
-
-The project includes a comprehensive suite of diagnostic tools to help you identify and fix issues:
-
-#### System Diagnostics
-
-Run the main diagnostics tool to check your entire system configuration:
-
-```bash
-python3 diagnostics.py
-```
-
-This tool checks:
-- System information and hardware compatibility
-- GPU configuration and Metal support for Apple Silicon
-- Environment variables and configuration
-- Model files and their status
-- Module structure and implementation
-- Quick functionality test
-
-It provides personalized recommendations based on your specific setup.
-
-#### Log Analysis
-
-Use the log analyzer to diagnose issues from log files:
-
-```bash
-# Analyze the most recent log file
-python3 analyze_logs.py
-
-# Analyze a specific log file
-python3 analyze_logs.py --log path/to/logfile.log
-
-# Analyze all log files in a directory
-python3 analyze_logs.py --dir logs --all
-```
-
-The log analyzer automatically identifies common error patterns and provides targeted solutions.
-
-#### GPU Acceleration Check
-
-To specifically check GPU acceleration support:
-
-```bash
-python3 check_gpu.py
-```
-
-#### HuggingFace Transfer Issues
-
-If you encounter issues with model downloads:
-
-```bash
-# Run the hf_transfer diagnostics tool
-python3 install_hf_transfer.py --diagnose
-
-# Force reinstall hf_transfer
-pip3 uninstall -y hf_transfer
-pip3 install hf_transfer==0.1.4
-```
-
-### Common Issues
-
-#### GPU Acceleration Not Working
-
-If GPU acceleration is not working as expected:
-
-```bash
-# Force specific configuration in .env
-USE_GPU=True
-USE_METAL=True  # For Apple Silicon
-GPU_LAYERS=32   # Adjust based on your GPU capability
-```
-
-#### Context Length Warnings
-
-If you see context length warnings in model output:
-
-```
-# Add to your .env file
-CONTEXT_LENGTH=4096
-```
-
-#### Memory Issues
-
-If the model is crashing due to memory constraints:
-
-1. Try a smaller model variant
-2. Reduce `GPU_LAYERS` setting in `.env`
-3. Set `USE_GPU=False` to use CPU only mode
-4. Adjust batch size with `BATCH_SIZE=1` in `.env`
-
-## Credits
-
-Built with python3, OpenAI, HuggingFace, DuckDuckGo Search, FastAPI, and Streamlit.
+For detailed information, see the [Criminal IP Integration](CRIMINALIP_INTEGRATION.md) documentation and [API Format](CRIMINALIP_API_FORMAT.md) reference.
+````

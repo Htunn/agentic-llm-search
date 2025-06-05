@@ -86,11 +86,17 @@ main() {
     export DEFAULT_MODEL=./src/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf
   fi
   
+  # Check for Criminal IP configuration without setting up
+  if [ -n "$CRIMINAL_IP_API_KEY" ]; then
+    echo "Criminal IP API key found in environment."
+  fi
+  
   echo ""
   echo "Choose an interface:"
   echo "1. Command Line Interface"
   echo "2. Web Interface (Streamlit)"
-  read -p "Enter your choice (1-2): " interface_choice
+  echo "3. Criminal IP CLI (Cybersecurity Search)"
+  read -p "Enter your choice (1-3): " interface_choice
   
   case $interface_choice in
     1)
@@ -100,6 +106,50 @@ main() {
     2)
       echo "Starting web interface with Streamlit..."
       streamlit run app.py
+      ;;
+    3)
+      if [ -z "$CRIMINAL_IP_API_KEY" ]; then
+        echo "[Error] Criminal IP API key not found in environment."
+        echo "Please set the CRIMINAL_IP_API_KEY in your .env file or environment."
+        echo "For help setting up the API key, visit: https://www.criminalip.io/developer"
+        exit 1
+      fi
+      
+      echo "Criminal IP Cybersecurity Search"
+      echo "---------------------------------"
+      echo "Choose an operation:"
+      echo "1. IP Address Lookup"
+      echo "2. Domain Analysis"
+      echo "3. Asset Search"
+      echo "4. Banner Search"
+      echo "5. Account Information"
+      echo "6. Help / All Commands"
+      read -p "Enter your choice (1-6): " criminalip_choice
+      
+      case $criminalip_choice in
+        1)
+          read -p "Enter an IP address to analyze: " ip_address
+          python3 criminalip_cli.py ip "$ip_address"
+          ;;
+        2)
+          read -p "Enter a domain to analyze: " domain
+          python3 criminalip_cli.py domain "$domain"
+          ;;
+        3)
+          read -p "Enter a search query: " search_query
+          python3 criminalip_cli.py search "$search_query"
+          ;;
+        4)
+          read -p "Enter a banner search query: " banner_query
+          python3 criminalip_cli.py banner "$banner_query"
+          ;;
+        5)
+          python3 criminalip_cli.py info
+          ;;
+        6|*)
+          python3 criminalip_cli.py help
+          ;;
+      esac
       ;;
     *)
       echo "Invalid choice. Exiting."

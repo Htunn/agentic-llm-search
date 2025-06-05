@@ -105,3 +105,133 @@ for source in response.sources:
 - Use responsibly and ethically
 - Do not use this tool to access systems without permission
 - Always respect privacy and legal restrictions
+
+## Architecture Diagrams
+
+### Component Diagram
+
+```mermaid
+graph TD
+    User[User] --> |Input| App[Streamlit App]
+    User --> |Input| CLI[Shodan CLI]
+    
+    subgraph "Interface Layer"
+        App
+        CLI
+    end
+    
+    subgraph "Agent Layer"
+        Agent[AgenticLLMAgent]
+    end
+    
+    subgraph "Tools Layer"
+        SearchTool[InternetSearchTool]
+        ShodanTool[ShodanSearchTool]
+    end
+    
+    subgraph "External API"
+        ShodanAPI[Shodan API]
+    end
+    
+    App --> |Query| Agent
+    CLI --> |Query| Agent
+    CLI --> |Direct| ShodanTool
+    
+    Agent --> |Search| SearchTool
+    Agent --> |Host Lookup| ShodanTool
+    SearchTool --> |Shodan Specific Queries| ShodanTool
+    
+    ShodanTool --> |API Requests| ShodanAPI
+    ShodanAPI --> |Results| ShodanTool
+    ShodanTool --> |Results| SearchTool
+    ShodanTool --> |Results| Agent
+    SearchTool --> |Results| Agent
+    Agent --> |Response| App
+    Agent --> |Response| CLI
+```
+
+### Sequence Diagram: Search Process
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant CLI as Shodan CLI
+    participant Agent as AgenticLLMAgent
+    participant SearchTool as InternetSearchTool
+    participant ShodanTool as ShodanSearchTool
+    participant API as Shodan API
+    
+    alt Direct CLI Usage
+        User->>CLI: shodan_cli.py search "query"
+        CLI->>ShodanTool: search(query, limit)
+        ShodanTool->>API: HTTP Request (search)
+        API->>ShodanTool: JSON Response
+        ShodanTool->>CLI: Formatted Results
+        CLI->>User: Display Results
+    else Agent-Based Analysis
+        User->>CLI: shodan_cli.py search "query" --agent
+        CLI->>Agent: process_shodan_query(query)
+        Agent->>SearchTool: shodan_search(query)
+        SearchTool->>ShodanTool: search(query)
+        ShodanTool->>API: HTTP Request (search)
+        API->>ShodanTool: JSON Response
+        ShodanTool->>SearchTool: Structured Results
+        SearchTool->>Agent: Search Results
+        Agent->>Agent: Analyze with LLM
+        Agent->>CLI: Analysis Response
+        CLI->>User: Display Analysis
+    end
+```
+
+### Sequence Diagram: Host Lookup Process
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant CLI as Shodan CLI
+    participant Agent as AgenticLLMAgent
+    participant ShodanTool as ShodanSearchTool
+    participant API as Shodan API
+    
+    alt Direct CLI Usage
+        User->>CLI: shodan_cli.py host "IP"
+        CLI->>ShodanTool: host(ip)
+        ShodanTool->>API: HTTP Request (host lookup)
+        API->>ShodanTool: JSON Response
+        ShodanTool->>CLI: Structured Host Info
+        CLI->>User: Display Host Info
+    else Agent-Based Analysis
+        User->>CLI: shodan_cli.py host "IP" --agent
+        CLI->>Agent: process_shodan_host(ip)
+        Agent->>ShodanTool: host(ip)
+        ShodanTool->>API: HTTP Request (host lookup)
+        API->>ShodanTool: JSON Response
+        ShodanTool->>Agent: Host Information
+        Agent->>Agent: Analyze with LLM
+        Agent->>CLI: Analysis Response
+        CLI->>User: Display Analysis
+    end
+```
+
+### Deployment Diagram
+
+```mermaid
+graph TD
+    subgraph "User Environment"
+        CLI[Shodan CLI]
+        APP[Streamlit Web App]
+        LLM[LLM Model]
+    end
+    
+    subgraph "Shodan Cloud Service"
+        API[Shodan API]
+        DB[(Shodan Database)]
+    end
+    
+    CLI --> |HTTPS Requests| API
+    APP --> |HTTPS Requests| API
+    API --> DB
+    
+    CLI --> |Local Processing| LLM
+    APP --> |Local Processing| LLM
+```
